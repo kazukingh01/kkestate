@@ -1,0 +1,175 @@
+import bs4, re, argparse, requests, datetime
+import pandas as pd
+import numpy as np
+from kkpsgre.psgre import Psgre
+from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME
+
+
+BASE_URL = "https://suumo.jp"
+LIST_TYPE = ["ms/shinchiku", "ms/chuko", "ikkodate", "chukoikkodate"]
+LIST_MST_URLS = [
+    f"{BASE_URL}/{y}/{x}/city/" for x in [
+        "hokkaido_", "aomori", "iwate", "akita", "miyagi", "yamagata", "fukushima",
+        "niigata", "ishikawa", "toyama", "nagano", "yamanashi", "fukui",
+        "tochigi", "gumma", "saitama", "ibaraki", "chiba", "tokyo", "kanagawa",
+        "gifu", "shizuoka", "aichi", "mie",
+        "shiga", "kyoto", "osaka", "nara", "wakayama", "hyogo",
+        "tottori", "shimane", "okayama", "hiroshima", "yamaguchi",
+        "kagawa", "tokushima", "kochi", "ehime",
+        "fukuoka", "oita", "saga", "nagasaki", "kumamoto", "miyazaki", "kagoshima", "okinawa",
+    ] for y in LIST_TYPE
+]
+
+
+def get_url_ichiran(url):
+    assert isinstance(url, str)
+    print(f"get from: {url}")
+    html = requests.get(url)
+    soup = bs4.BeautifulSoup(html.content, 'html.parser')
+    list_sc  = [x.attrs["value"] for x in soup.find_all("input", attrs={'name': 'sc', "type": "checkbox"})]
+    list_key = re.findall(r'<input[^>]+name="([^"]*)"[^>]+type="hidden"[^>]+>', str(soup.find("form", id="js-areaSelectForm")).strip())
+    list_val = re.findall(r'<input[^>]+type="hidden"[^>]+value="([^"]*)">', str(soup.find("form", id="js-areaSelectForm")).strip())
+    assert len(list_key) == len(list_val)
+    url_list  = f"{BASE_URL}/jj/bukken/ichiran/JJ010FJ001/?"
+    url_list += "&".join([x + "=" + y for x, y in zip(list_key, list_val)])
+    url_list += "&" + "&".join([f"sc={x}" for x in list_sc])
+    url_list += "&" + "kb=1&kt=9999999&km=1&mb=0&mt=9999999&ekTjCd=&ekTjNm=&tj=0"
+    print(f"create: {url_list}")
+    return url_list
+
+
+def get_estate_list(url: str):
+    assert isinstance(url, str)
+    print(url)
+    html = requests.get(url)
+    soup = bs4.BeautifulSoup(html.content, 'html.parser')
+    soup = soup.find("div", id="js-bukkenList")
+    assert soup is not None
+    if soup.find("li", class_="cassette_list-item") is not None:
+        list_title = [x.find("div", class_="cassette_header").find("h2").text.strip() for x in soup.find_all("li", class_="cassette_list-item")]
+        list_urls  = [x.find("div", class_="cassette_header").find("h2").find("a").attrs["href"].strip() for x in soup.find_all("li", class_="cassette_list-item")]
+    else:
+        list_title = [x.find("h2", class_="property_unit-title").text.strip() for x in soup.find_all("div", class_="property_unit")]
+        list_urls  = [x.find("h2", class_="property_unit-title").find("a").attrs["href"].strip() for x in soup.find_all("div", class_="property_unit")]
+    assert len(list_title) == len(list_urls)
+    df = pd.DataFrame(list_title, columns=["name"])
+    df["url"] = list_urls
+    return df.to_dict()
+
+
+def get_estate_detail(url):
+    assert isinstance(url, str)
+    url  = f"{url}property/" if url[-1] == "/" else f"{url}/property/"
+    print(url)
+    html = requests.get(url)
+    soup = bs4.BeautifulSoup(html.content, 'html.parser')
+    dict_ret = {}
+    if len(soup.find_all("div", class_="error-content")) > 0:
+        print("warning. web page is nothing.")
+    if len(soup.find_all("div", id="js-normal_tabs")) > 0:
+        # shintiku & some estates. https://suumo.jp/ms/shinchiku/tokyo/sc_minato/nc_67729968/property/
+        _key     = [y.text.strip() for x in soup.find("div", class_="section_h2").find_all("table", class_="detailtable") for y in x.find_all("th", class_="detailtable-title")]
+        _val     = [y.text.strip() for x in soup.find("div", class_="section_h2").find_all("table", class_="detailtable") for y in x.find_all("td", class_="detailtable-body")]
+        dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
+        _key     = [x.text.strip() for x in soup.find("div", id="bukkenSummary").find("table", class_="detailtable").find_all("th", class_="detailtable-title")]
+        _val     = [x.text.strip() for x in soup.find("div", id="bukkenSummary").find("table", class_="detailtable").find_all("td", class_="detailtable-body")]
+        dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
+    else:
+        for soupwk in [x.find_parent("div", class_="mt20") for x in soup.find_all("div", class_="secTitleOuterK")]:
+            if soupwk is None: continue
+            title = soupwk.find("div", class_="secTitleOuterK").text.strip()
+            print(title)
+            if len(soupwk.find_all("table")) > 0:
+                tbl    = soupwk.find("table", summary="表")
+                if tbl is None: continue
+                _key   = [y.text.strip().replace("\nヒント", "") for y in tbl.find_all("th")]
+                _val   = [re.sub(r"[\t\n\r\f]+", r"\t", y.find_next("td").text.strip().replace("\nヒント", "")) for y in tbl.find_all("th")]
+                dict_ret = dict_ret | {title + "_" + x:y for x, y in zip(_key, _val)}
+            else:
+                dict_ret[title] = re.sub(r"[\t\n\r\f]+", r"\t", soupwk.find_next("div", class_="mt10").text.strip()) 
+    dict_ret = {x: re.sub(r"[\t\n\r\f]+", r"\t", y) for x, y in dict_ret.items()} # again
+    return dict_ret
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--updateurls", action='store_true', default=False)
+    parser.add_argument("--update",     action='store_true', default=False)
+    parser.add_argument("--skipmain",   action='store_true', default=False)
+    parser.add_argument("--datefrom",   type=str, help="--datefrom 20230101", required=False)
+    args = parser.parse_args()
+
+    # connection
+    db = Psgre(f"host={HOST} port={PORT} dbname={DBNAME} user={USER} password={PASS}", max_disp_len=200)
+
+    # get url list
+    if args.updateurls:
+        list_urls = []
+        for x in LIST_MST_URLS:
+            url = get_url_ichiran(x)
+            html = requests.get(url)
+            soup = bs4.BeautifulSoup(html.content, 'html.parser')
+            if len(soup.find_all("div", class_="error_pop")) > 0: continue
+            if soup.find("ol", class_="pagination-parts") is not None:
+                list_page = int([x.text for x in soup.find("ol", class_="pagination-parts").find_all("li")][-1])
+            else:
+                list_page = int([x.text for x in soup.find("ol", class_="sortbox_pagination-parts").find_all("li", class_="sortbox_pagination-list")][-1])
+            list_page = list(range(1, list_page + 1))
+            for i_page in list_page: list_urls.append(f"{url}&page={i_page}" if url.find("?") > 0 else f"{url}?page={i_page}")
+        if args.update:
+            db.set_sql("delete from estate_tmp;")
+            db.insert_from_df(pd.DataFrame(list_urls, columns=["url"]), "estate_tmp", is_select=False)
+            db.execute_sql()
+    else:
+        list_urls = db.select_sql("select url from estate_tmp;")["url"].tolist()
+    
+    # main
+    if args.skipmain == False:
+        for i_url, url in enumerate(list_urls):
+            dictwk = get_estate_list(url)
+            df     = pd.DataFrame(dictwk)
+            if df.shape[0] > 0 and args.update:
+                df_main = db.select_sql("select id, url from estate_main where url in ('" + "','".join(df["url"].tolist())+ "');")
+                df      = pd.merge(df, df_main, how="left", on="url")
+                if df["id"].isna().sum() > 0:
+                    db.insert_from_df(df.loc[df["id"].isna(), ["name", "url"]], "estate_main", is_select=False)
+                    db.execute_sql()
+                df_main = db.select_sql("select id as id_new, url from estate_main where url in ('" + "','".join(df["url"].tolist())+ "');")
+                df      = pd.merge(df, df_main, how="left", on="url")
+                if args.update:
+                    db.execute_sql("update estate_main set sys_updated = CURRENT_TIMESTAMP where id in (" + ",".join(df["id_new"].astype(str).tolist()) +");")
+
+    # detail
+    if args.datefrom is None:
+        date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    else:
+        date = datetime.datetime.fromisoformat(args.datefrom).strftime('%Y-%m-%d %H:%M:%S')
+    df = db.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
+    list_df = []
+    for url, id_new in df[["url", "id"]].values:
+        if args.update:
+            id_run = db.execute_sql(f"INSERT into estate_run (id_main, timestamp) VALUES ({id_new}, CURRENT_TIMESTAMP);SELECT lastval();")[0][0]
+        else:
+            id_run = None
+        dict_ret  = get_estate_detail(BASE_URL + url)
+        df_detail = pd.Series(dict_ret).reset_index()
+        df_detail.columns = ["key", "value"]
+        # register mst key
+        if df_detail.shape[0] > 0 and args.update:
+            df_key    = db.select_sql("select id, name as key from estate_mst_key where name in ('" + "','".join(df_detail["key"].unique().tolist())+ "');")
+            df_detail = pd.merge(df_detail, df_key, how="left", on="key")
+            if df_detail["id"].isna().sum() > 0:
+                df_insert = pd.DataFrame(df_detail.loc[df_detail["id"].isna(), "key"].unique(), columns=["name"])
+                db.insert_from_df(df_insert, "estate_mst_key", is_select=False)
+                db.execute_sql()
+            df_key    = db.select_sql("select id as id_key, name as key from estate_mst_key where name in ('" + "','".join(df_detail["key"].unique().tolist())+ "');")
+            df_detail = pd.merge(df_detail, df_key, how="left", on="key")
+        # insert
+        df_detail["id_run"]  = id_run
+        if df_detail.shape[0] > 0 and args.update:
+            df_prev_run = db.select_sql(f"select * from estate_run where id_main = {id_new} and timestamp >= '{(datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')}';")
+            df_prev     = db.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +") and id_key in (" + ",".join(df_detail["id_key"].astype(str).tolist()) + ");")
+            df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_run", "id_key"])
+            df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
+            db.insert_from_df(df_detail[["id_run", "id_key", "value"]], "estate_detail", is_select=False)
+            db.execute_sql()
