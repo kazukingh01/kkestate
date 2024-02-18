@@ -159,6 +159,7 @@ ALTER SEQUENCE public.estate_run_id_seq OWNED BY public.estate_run.id;
 
 CREATE TABLE public.estate_tmp (
     url text NOT NULL,
+    is_checked boolean DEFAULT false NOT NULL,
     sys_updated timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 

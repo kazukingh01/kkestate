@@ -1,4 +1,4 @@
-import bs4, re, argparse, requests, datetime
+import bs4, re, argparse, requests, datetime, time
 import pandas as pd
 import numpy as np
 from kkpsgre.psgre import Psgre
@@ -47,9 +47,19 @@ def get_url_ichiran(url):
 def get_estate_list(url: str):
     assert isinstance(url, str)
     LOGGER.info(url)
-    html = requests.get(url)
-    soup = bs4.BeautifulSoup(html.content, 'html.parser')
-    soup = soup.find("div", id="js-bukkenList")
+    cnt = 0
+    while True:
+        html = requests.get(url)
+        soup = bs4.BeautifulSoup(html.content, 'html.parser')
+        soup = soup.find("div", id="js-bukkenList")
+        if soup is None:
+            LOGGER.warning("soup is None.")
+            cnt += 1
+            if cnt >= 3: break
+            time.sleep(5)
+            continue
+        else:
+            break
     if soup is None:
         LOGGER.raise_error(f"""
             URL: {url},
@@ -137,13 +147,15 @@ if __name__ == "__main__":
             DB.insert_from_df(pd.DataFrame(list_urls, columns=["url"]), "estate_tmp", is_select=False)
             DB.execute_sql()
     else:
-        list_urls = DB.select_sql("select url from estate_tmp;")["url"].tolist()
+        list_urls = DB.select_sql("select url from estate_tmp where is_checked = false;")["url"].tolist()
     
     # main
     if args.skipmain == False:
         for i_url, url in enumerate(list_urls):
             dictwk = get_estate_list(url)
             df     = pd.DataFrame(dictwk)
+            if args.update:
+                DB.execute_sql(f"update estate_tmp set is_checked = true where url = '{url}';")
             if df.shape[0] > 0 and args.update:
                 df_main = DB.select_sql("select id, url from estate_main where url in ('" + "','".join(df["url"].tolist())+ "');")
                 df      = pd.merge(df, df_main, how="left", on="url")
