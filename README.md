@@ -85,15 +85,26 @@ APT::Periodic::Update-Package-Lists "0";
 APT::Periodic::Unattended-Upgrade "0";
 ```
 
+### Other
+
+```bash
+sudo mkdir /home/share
+sudo chown -R ubuntu:ubuntu /home/share/
+```
+
+### Reboot
+
 ```bash
 sudo reboot
 ```
+
+# Estate programs
 
 ### Python
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev git iputils-ping net-tools vim cron rsyslog
+sudo apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev git iputils-ping net-tools cron rsyslog
 git clone https://github.com/pyenv/pyenv.git ~/.pyenv
 cd ~/.pyenv/plugins/python-build
 sudo bash ./install.sh
@@ -106,28 +117,22 @@ python -m venv ~/venv
 source ~/venv/bin/activate
 ```
 
-### Other
+### Git clone
 
 ```bash
-sudo mkdir /home/share
-sudo chown -R ubuntu:ubuntu /home/share/
+cd ~
+git clone https://github.com/kazukingh01/kkestate.git
+cd ~/kkestate/
+pip install -e .
 ```
-
-# Run Database Container ( For Docker )
-
-### Docker run
-
-```bash
-sudo docker run -itd --name postgres --shm-size=4g -v /home/share:/home/share postgres:16.0 /bin/bash --login
-sudo docker exec postgres /etc/init.d/postgresql restart
-
 
 # Database
 
 ### Postgres Container
 
 ```bash
-docker image build -t postgres:16.1.jp .
+cd ~/kkestate
+sudo docker image build -t postgres:16.1.jp .
 sudo docker run --name psgre \
     -e POSTGRES_PASSWORD=postgres \
     -e POSTGRES_INITDB_ARGS="--encoding=UTF8 --locale=ja_JP.utf8" \
@@ -135,6 +140,7 @@ sudo docker run --name psgre \
     -v postgresdb:/var/lib/postgresql/data \
     -v /home/share:/home/share \
     -p 45432:5432 \
+    --shm-size=4g \
     -d postgres:16.1.jp
 ```
 
@@ -157,6 +163,13 @@ sudo docker exec --user=postgres psgre pg_dump -U postgres -d estate -s > ./sche
 
 # Run
 
+### Set config
+
 ```bash
-python -i suumo.py --update --updateurls
+vi ~/kkestate/kkestate/config/psgre.py
+```
+
+```bash
+cd ~/kkestate/main/
+nohup python suumo.py --update --updateurls &
 ```
