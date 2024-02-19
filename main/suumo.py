@@ -51,6 +51,9 @@ def get_estate_list(url: str):
     while True:
         html = requests.get(url)
         soup = bs4.BeautifulSoup(html.content, 'html.parser')
+        if len(soup.find_all("div", class_="error_pop")) > 0:
+            # There is not list of estates.
+            return {}
         soup = soup.find("div", id="js-bukkenList")
         if soup is None:
             LOGGER.warning("soup is None.")
