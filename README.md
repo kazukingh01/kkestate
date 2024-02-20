@@ -139,7 +139,7 @@ sudo docker run --name psgre \
     -e TZ=Asia/Tokyo \
     -v postgresdb:/var/lib/postgresql/data \
     -v /home/share:/home/share \
-    -p 45432:5432 \
+    -p 5432:5432 \
     --shm-size=4g \
     -d postgres:16.1.jp
 ```
