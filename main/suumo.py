@@ -1,9 +1,9 @@
 import bs4, re, argparse, requests, datetime, time
 import pandas as pd
-import numpy as np
 from kkpsgre.psgre import Psgre
 from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME
 from kkestate.util.logger import set_logger
+
 
 LOGGER    = set_logger(__name__)
 BASE_URL  = "https://suumo.jp"
@@ -94,29 +94,56 @@ def get_estate_detail(url):
     soup = bs4.BeautifulSoup(html.content, 'html.parser')
     dict_ret = {}
     if len(soup.find_all("div", class_="error-content")) > 0:
-        LOGGER.warning("warning. web page is nothing.")
+        LOGGER.warning("web page is nothing.")
     if len(soup.find_all("div", id="js-normal_tabs")) > 0:
-        # shintiku & some estates. https://suumo.jp/ms/shinchiku/tokyo/sc_minato/nc_67729968/property/
-        _key     = [y.text.strip() for x in soup.find("div", class_="section_h2").find_all("table", class_="detailtable") for y in x.find_all("th", class_="detailtable-title")]
-        _val     = [y.text.strip() for x in soup.find("div", class_="section_h2").find_all("table", class_="detailtable") for y in x.find_all("td", class_="detailtable-body")]
+        # suumo's real estate.
+        ## section_h2-header
+        tbl = soup.find("div", class_="section_h2-header").find_next("div", class_="section_h2-body").find("table", class_="detailtable")
+        _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
+        _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
         dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
-        _key     = [x.text.strip() for x in soup.find("div", id="bukkenSummary").find("table", class_="detailtable").find_all("th", class_="detailtable-title")]
-        _val     = [x.text.strip() for x in soup.find("div", id="bukkenSummary").find("table", class_="detailtable").find_all("td", class_="detailtable-body")]
+        ## ui-section_h3-header
+        list_soups = soup.find_all("div", class_="ui-section_h3-header")
+        for soupwk in list_soups:
+            title    = soupwk.find("h3").text.strip()
+            title    = re.findall(r"第[0-9]+期", title)
+            title    = "_" + title[0] if len(title) > 0 else ""
+            tbl      = soupwk.find_next("div", class_="ui-section_h3-body").find("table", class_="detailtable")
+            _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
+            _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
+            dict_ret = dict_ret | {x + title:y for x, y in zip(_key, _val)}
+        ## kaishainfo
+        url = url.replace("property/", "kaishainfo/")
+        LOGGER.info(url)
+        html = requests.get(url)
+        soup = bs4.BeautifulSoup(html.content, 'html.parser')
+        tbl  = soup.find("div", class_="section_h2-header").find_next("div", class_="section_h2-body").find("table", class_="detailtable")
+        _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
+        _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
         dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
     else:
-        for soupwk in [x.find_parent("div", class_="mt20") for x in soup.find_all("div", class_="secTitleOuterK")]:
+        list_titles_class = ["secTitleOuterK", "secTitleOuterR"]
+        list_soups, target_name = [], None
+        for x in list_titles_class:
+            list_soups = soup.find_all("div", class_=x)
+            if len(list_soups) > 0:
+                target_name = x
+                break
+        if len(list_soups) == 0:
+            LOGGER.warning(f"list_titles_class: {list_titles_class} is nothing.")
+        for soupwk in [x.find_parent("div", class_="mt20") for x in list_soups]:
             if soupwk is None: continue
-            title = soupwk.find("div", class_="secTitleOuterK").text.strip()
+            title = soupwk.find("div", class_=target_name).text.strip()
             LOGGER.info(title)
             if len(soupwk.find_all("table")) > 0:
                 tbl    = soupwk.find("table", summary="表")
                 if tbl is None: continue
                 _key   = [y.text.strip().replace("\nヒント", "") for y in tbl.find_all("th")]
                 _val   = [re.sub(r"[\t\n\r\f]+", r"\t", y.find_next("td").text.strip().replace("\nヒント", "")) for y in tbl.find_all("th")]
-                dict_ret = dict_ret | {title + "_" + x:y for x, y in zip(_key, _val)}
+                dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
             else:
                 dict_ret[title] = re.sub(r"[\t\n\r\f]+", r"\t", soupwk.find_next("div", class_="mt10").text.strip()) 
-    dict_ret = {x: re.sub(r"[\t\n\r\f]+", r"\t", y) for x, y in dict_ret.items()} # again
+    dict_ret = {x: re.sub(r"[\t\n\r\f]+", r"\t", y).replace("\xa0", "") for x, y in dict_ret.items()} # again
     return dict_ret
 
 
