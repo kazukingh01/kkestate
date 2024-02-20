@@ -95,10 +95,10 @@ def get_estate_detail(url):
     dict_ret = {}
     if len(soup.find_all("div", class_="error-content")) > 0:
         LOGGER.warning("web page is nothing.")
-        return {}
+        return -1
     if soup.text.find("お探しの情報は、当サイトへの掲載が終了しているか、一時的にご覧いただけません。") >= 0:
         LOGGER.warning("web page is invalid for over the date when we can check or temporarily closed.")
-        return {}
+        return -1
     if len(soup.find_all("div", id="js-normal_tabs")) > 0:
         # suumo's real estate.
         ## section_h2-header
@@ -126,7 +126,7 @@ def get_estate_detail(url):
         _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
         dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
     else:
-        list_titles_class = ["secTitleOuterK", "secTitleOuterR"]
+        list_titles_class = ["secTitleOuterK", "secTitleOuterR", "secTitleInnerK", "secTitleInnerR"]
         list_soups, target_name = [], None
         for x in list_titles_class:
             list_soups = soup.find_all("div", class_=x)
@@ -214,6 +214,7 @@ if __name__ == "__main__":
             f"on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date_check_from}' " + 
             f"where main.sys_updated >= '{date}';"
         )
+        df = df.sort_values(["id", "id_run"]).groupby("id").last().reset_index()
         df = df.loc[df["id_run"].isna()].groupby("id").first().reset_index()
     else:
         df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
@@ -223,7 +224,11 @@ if __name__ == "__main__":
             id_run = DB.execute_sql(f"INSERT into estate_run (id_main, timestamp) VALUES ({id_new}, CURRENT_TIMESTAMP);SELECT lastval();")[0][0]
         else:
             id_run = None
-        dict_ret  = get_estate_detail(BASE_URL + url)
+        dict_ret = get_estate_detail(BASE_URL + url)
+        if isinstance(dict_ret, int):
+            if args.update:
+                DB.execute_sql(f"update estate_run set is_success = true where id = {id_run};")
+            continue
         df_detail = pd.Series(dict_ret, dtype=object).reset_index()
         df_detail.columns = ["key", "value"]
         # register mst key
