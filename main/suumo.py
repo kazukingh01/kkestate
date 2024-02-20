@@ -214,7 +214,7 @@ if __name__ == "__main__":
             f"on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date_check_from}' " + 
             f"where main.sys_updated >= '{date}';"
         )
-        df = df.loc[df["id_run"].isna()]
+        df = df.loc[df["id_run"].isna()].groupby("id").first().reset_index()
     else:
         df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
     list_df = []
