@@ -95,6 +95,10 @@ def get_estate_detail(url):
     dict_ret = {}
     if len(soup.find_all("div", class_="error-content")) > 0:
         LOGGER.warning("web page is nothing.")
+        return {}
+    if soup.text.find("お探しの情報は、当サイトへの掲載が終了しているか、一時的にご覧いただけません。") >= 0:
+        LOGGER.warning("web page is invalid for over the date when we can check or temporarily closed.")
+        return {}
     if len(soup.find_all("div", id="js-normal_tabs")) > 0:
         # suumo's real estate.
         ## section_h2-header
@@ -149,10 +153,11 @@ def get_estate_detail(url):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--updateurls", action='store_true', default=False)
-    parser.add_argument("--update",     action='store_true', default=False)
-    parser.add_argument("--skipmain",   action='store_true', default=False)
-    parser.add_argument("--datefrom",   type=str, help="--datefrom 20230101", required=False)
+    parser.add_argument("--updateurls",  action='store_true', default=False)
+    parser.add_argument("--update",      action='store_true', default=False)
+    parser.add_argument("--skipmain",    action='store_true', default=False)
+    parser.add_argument("--skipsuccess", action='store_true', default=False)
+    parser.add_argument("--datefrom",    type=str, help="--datefrom 20230101", required=False)
     args = parser.parse_args()
 
     # connection
@@ -202,7 +207,16 @@ if __name__ == "__main__":
         date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
     else:
         date = datetime.datetime.fromisoformat(args.datefrom).strftime('%Y-%m-%d %H:%M:%S')
-    df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
+    date_check_from = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
+    if args.skipsuccess:
+        df = DB.select_sql(
+            f"select main.id, main.url, sub.id as id_run, main.sys_updated from estate_main as main left join estate_run as sub " + 
+            f"on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date_check_from}' " + 
+            f"where main.sys_updated >= '{date}';"
+        )
+        df = df.loc[df["id_run"].isna()]
+    else:
+        df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
     list_df = []
     for url, id_new in df[["url", "id"]].values:
         if args.update:
@@ -210,7 +224,7 @@ if __name__ == "__main__":
         else:
             id_run = None
         dict_ret  = get_estate_detail(BASE_URL + url)
-        df_detail = pd.Series(dict_ret).reset_index()
+        df_detail = pd.Series(dict_ret, dtype=object).reset_index()
         df_detail.columns = ["key", "value"]
         # register mst key
         if df_detail.shape[0] > 0 and args.update:
@@ -225,7 +239,7 @@ if __name__ == "__main__":
         # insert
         df_detail["id_run"]  = id_run
         if df_detail.shape[0] > 0 and args.update:
-            df_prev_run = DB.select_sql(f"select * from estate_run where id_main = {id_new} and timestamp >= '{(datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')}';")
+            df_prev_run = DB.select_sql(f"select * from estate_run where id_main = {id_new} and timestamp >= '{date_check_from}';")
             df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +") and id_key in (" + ",".join(df_detail["id_key"].astype(str).tolist()) + ");")
             df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_run", "id_key"])
             df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
