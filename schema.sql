@@ -126,6 +126,7 @@ ALTER SEQUENCE public.estate_mst_key_id_seq OWNED BY public.estate_mst_key.id;
 CREATE TABLE public.estate_run (
     id bigint NOT NULL,
     id_main bigint NOT NULL,
+    is_success boolean DEFAULT false NOT NULL,
     "timestamp" timestamp without time zone
 );
 
