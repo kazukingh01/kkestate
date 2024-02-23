@@ -91,6 +91,9 @@ def get_estate_detail(url):
     url  = f"{url}property/" if url[-1] == "/" else f"{url}/property/"
     LOGGER.info(url)
     html = requests.get(url)
+    if html.status_code in [503]:
+        LOGGER.warning(f"STATUS CODE: {html.status_code}")
+        return -1
     soup = bs4.BeautifulSoup(html.content, 'html.parser')
     dict_ret = {}
     if len(soup.find_all("div", class_="error-content")) > 0:

@@ -133,13 +133,13 @@ pip install -e .
 ```bash
 cd ~/kkestate
 sudo docker image build -t postgres:16.1.jp .
+sudo mkdir -p /var/local/postgresql/data
 sudo docker run --name psgre \
     -e POSTGRES_PASSWORD=postgres \
     -e POSTGRES_INITDB_ARGS="--encoding=UTF8 --locale=ja_JP.utf8" \
     -e TZ=Asia/Tokyo \
-    -v postgresdb:/var/lib/postgresql/data \
+    -v /var/local/postgresql/data:/var/lib/postgresql/data \
     -v /home/share:/home/share \
-    -p 5432:5432 \
     --shm-size=4g \
     -d postgres:16.1.jp
 ```
@@ -159,6 +159,18 @@ sudo docker exec --user=postgres psgre psql -U postgres -d estate -f /home/share
 
 ```bash
 sudo docker exec --user=postgres psgre pg_dump -U postgres -d estate -s > ./schema.sql
+```
+
+##### Backup database
+
+```bash
+sudo docker exec --user=postgres psgre pg_dump -U postgres -Fc estate > ~/db_`date "+%Y%m%d"`.dump
+```
+
+##### Restore database
+
+```bash
+sudo docker exec --user=postgres psgre pg_restore -U postgres -a -d estate -Fc /home/share/db_`date "+%Y%m%d"`.dump
 ```
 
 # Run
