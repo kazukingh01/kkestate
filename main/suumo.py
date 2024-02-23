@@ -224,7 +224,12 @@ if __name__ == "__main__":
             id_run = DB.execute_sql(f"INSERT into estate_run (id_main, timestamp) VALUES ({id_new}, CURRENT_TIMESTAMP);SELECT lastval();")[0][0]
         else:
             id_run = None
-        dict_ret = get_estate_detail(BASE_URL + url)
+        try:
+            dict_ret = get_estate_detail(BASE_URL + url)
+        except ConnectionResetError:
+            LOGGER.warning("ConnectionResetError happend.")
+            time.sleep(60)
+            continue
         if isinstance(dict_ret, int):
             if args.update:
                 DB.execute_sql(f"update estate_run set is_success = true where id = {id_run};")
