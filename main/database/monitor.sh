@@ -36,6 +36,7 @@ fi
 
 if ! ps aux | grep -v grep | grep python | grep "${COMMAND}" > /dev/null; then
     echo "Process: ${COMMAND} not found! Restarting..."
+    pkill python
     touch ${LOGFILE}
     nohup ${PYTHON} ${COMMAND} >> ${LOGFILE} 2>&1 &
 else
