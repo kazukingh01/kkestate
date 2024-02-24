@@ -8,7 +8,6 @@
 0  0  8,22  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
 0  0  9,23  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
 0  0  10,24 * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 1,15  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 1
 0  12 2,16  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 2
 0  12 3,17  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 2
 0  12 4,18  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
