@@ -229,8 +229,8 @@ if __name__ == "__main__":
             id_run = None
         try:
             dict_ret = get_estate_detail(BASE_URL + url)
-        except ConnectionResetError:
-            LOGGER.warning("ConnectionResetError happend.")
+        except (ConnectionResetError, requests.exceptions.ChunkedEncodingError) as e:
+            LOGGER.warning(f"{str(e)} happend.")
             time.sleep(60)
             continue
         if isinstance(dict_ret, int):
