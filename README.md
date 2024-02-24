@@ -149,7 +149,7 @@ sudo docker run --name psgre \
 ```bash
 sudo docker exec --user=postgres psgre /usr/lib/postgresql/16/bin/dropdb estate
 sudo docker exec --user=postgres psgre /usr/lib/postgresql/16/bin/createdb --encoding=UTF8 --locale=ja_JP.utf8 --template=template0 --port 5432 estate
-cp schema.sql /home/share/
+cp ~/kkestate/main/database/schema.sql /home/share/
 sudo docker exec --user=postgres psgre psql -U postgres -d estate -f /home/share/schema.sql 
 ```
 
@@ -164,7 +164,7 @@ sudo docker exec --user=postgres psgre pg_dump -U postgres -d estate -s > ./sche
 ##### Backup database
 
 ```bash
-sudo docker exec --user=postgres psgre pg_dump -U postgres -Fc estate > ~/db_`date "+%Y%m%d"`.dump
+sudo docker exec --user=postgres psgre pg_dump -U postgres -Fc estate > ./db_`date "+%Y%m%d"`.dump
 ```
 
 ##### Restore database
@@ -184,13 +184,13 @@ vi ~/kkestate/kkestate/config/psgre.py
 ### Cron
 
 ```bash
-cat ~/kkestate/main/crontab | sudo tee -a /etc/crontab
+cat ~/kkestate/main/database/crontab | sudo tee -a /etc/crontab
 sudo /etc/init.d/cron restart
 ```
 
 ### Test
 
 ```bash
-cd ~/kkestate/main/
+cd ~/kkestate/main/database/
 bash monitor.sh 1
 ```

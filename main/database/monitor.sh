@@ -2,7 +2,7 @@
 
 HOMEDIR="/home/ubuntu"
 LOGDIR="${HOMEDIR}/kkestate/main/log/"
-MODULE="${HOMEDIR}/kkestate/main/suumo.py"
+MODULE="${HOMEDIR}/kkestate/main/database/suumo.py"
 PYTHON="${HOMEDIR}/venv/bin/python"
 
 NUM=$1
