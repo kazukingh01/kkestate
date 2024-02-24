@@ -34,7 +34,7 @@ else
     exit 1
 fi
 
-if ! ps aux | grep -v grep | grep python | grep ${COMMAND} > /dev/null; then
+if ! ps aux | grep -v grep | grep python | grep "${COMMAND}" > /dev/null; then
     echo "Process: ${COMMAND} not found! Restarting..."
     touch ${LOGFILE}
     nohup ${PYTHON} ${COMMAND} >> ${LOGFILE} 2>&1 &
