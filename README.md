@@ -184,7 +184,7 @@ vi ~/kkestate/kkestate/config/psgre.py
 ### Cron
 
 ```bash
-cat ~/kkestate/main/database/crontab | sudo tee -a /etc/crontab
+cat ~/kkestate/main/crontab | sudo tee -a /etc/crontab
 sudo /etc/init.d/cron restart
 ```
 
