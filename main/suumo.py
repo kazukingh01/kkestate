@@ -1,4 +1,4 @@
-import bs4, re, argparse, requests, datetime, time
+import bs4, re, argparse, requests, datetime, time, copy
 import pandas as pd
 from kkpsgre.psgre import Psgre
 from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME
@@ -102,32 +102,39 @@ def get_estate_detail(url):
     if soup.text.find("お探しの情報は、当サイトへの掲載が終了しているか、一時的にご覧いただけません。") >= 0:
         LOGGER.warning("web page is invalid for over the date when we can check or temporarily closed.")
         return -1
-    if len(soup.find_all("div", id="js-normal_tabs")) > 0:
+    if (len(soup.find_all("div", id="js-normal_tabs")) > 0) or (len(soup.find_all("div", class_="l-contents")) > 0):
         # suumo's real estate.
         ## section_h2-header
         tbl = soup.find("div", class_="section_h2-header").find_next("div", class_="section_h2-body").find("table", class_="detailtable")
-        _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
-        _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
-        dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
-        ## ui-section_h3-header
-        list_soups = soup.find_all("div", class_="ui-section_h3-header")
-        for soupwk in list_soups:
-            title    = soupwk.find("h3").text.strip()
-            title    = re.findall(r"第[0-9]+期", title)
-            title    = "_" + title[0] if len(title) > 0 else ""
-            tbl      = soupwk.find_next("div", class_="ui-section_h3-body").find("table", class_="detailtable")
+        if tbl is not None:
             _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
             _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
-            dict_ret = dict_ret | {x + title:y for x, y in zip(_key, _val)}
-        ## kaishainfo
-        url = url.replace("property/", "kaishainfo/")
-        LOGGER.info(url)
-        html = requests.get(url)
-        soup = bs4.BeautifulSoup(html.content, 'html.parser')
-        tbl  = soup.find("div", class_="section_h2-header").find_next("div", class_="section_h2-body").find("table", class_="detailtable")
-        _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
-        _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
-        dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
+            dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
+        ## ui-section_h2-header, ui-section_h3-header
+        list_tbls = [] # to avoid same table
+        for label_class in ["ui-section_h3", "ui-section_h2"]:
+            list_soups = soup.find_all("div", class_=f"{label_class}-header")
+            for soupwk in list_soups:
+                title = soupwk.find(label_class[-2:]).text.strip()
+                title = re.findall(r"第[0-9]+期", title)
+                title = "_" + title[0] if len(title) > 0 else ""
+                tbl   = soupwk.find_next("div", class_=f"{label_class}-body").find("table", class_="detailtable")
+                if tbl is not None:
+                    if tbl in list_tbls: continue # to avoid same table
+                    list_tbls.append(copy.deepcopy(tbl))
+                    _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
+                    _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
+                    dict_ret = dict_ret | {x + title:y for x, y in zip(_key, _val)}
+        if (len(soup.find_all("div", id="js-normal_tabs")) > 0):
+            ## kaishainfo
+            url = url.replace("property/", "kaishainfo/")
+            LOGGER.info(url)
+            html = requests.get(url)
+            soup = bs4.BeautifulSoup(html.content, 'html.parser')
+            tbl  = soup.find("div", class_="section_h2-header").find_next("div", class_="section_h2-body").find("table", class_="detailtable")
+            _key     = [x.text.strip() for x in tbl.find_all("th", class_="detailtable-title")]
+            _val     = [x.text.strip() for x in tbl.find_all("td", class_="detailtable-body")]
+            dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
     else:
         list_titles_class = ["secTitleOuterK", "secTitleOuterR", "secTitleInnerK", "secTitleInnerR"]
         list_soups, target_name = [], None
