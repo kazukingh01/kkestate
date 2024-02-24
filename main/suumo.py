@@ -165,7 +165,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--updateurls",  action='store_true', default=False)
     parser.add_argument("--update",      action='store_true', default=False)
-    parser.add_argument("--skipmain",    action='store_true', default=False)
+    parser.add_argument("--runmain",     action='store_true', default=False)
+    parser.add_argument("--rundetail",   action='store_true', default=False)
     parser.add_argument("--skipsuccess", action='store_true', default=False)
     parser.add_argument("--datefrom",    type=str, help="--datefrom 20230101", required=False)
     args = parser.parse_args()
@@ -195,7 +196,7 @@ if __name__ == "__main__":
         list_urls = DB.select_sql("select url from estate_tmp where is_checked = false;")["url"].tolist()
     
     # main
-    if args.skipmain == False:
+    if args.runmain:
         for i_url, url in enumerate(list_urls):
             dictwk = get_estate_list(url)
             df     = pd.DataFrame(dictwk)
@@ -213,56 +214,57 @@ if __name__ == "__main__":
                     DB.execute_sql("update estate_main set sys_updated = CURRENT_TIMESTAMP where id in (" + ",".join(df["id_new"].astype(str).tolist()) +");")
 
     # detail
-    if args.datefrom is None:
-        date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
-    else:
-        date = datetime.datetime.fromisoformat(args.datefrom).strftime('%Y-%m-%d %H:%M:%S')
-    date_check_from = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
-    if args.skipsuccess:
-        df = DB.select_sql(
-            f"select main.id, main.url, sub.id as id_run, main.sys_updated from estate_main as main left join estate_run as sub " + 
-            f"on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date_check_from}' " + 
-            f"where main.sys_updated >= '{date}';"
-        )
-        df = df.sort_values(["id", "id_run"]).groupby("id").last().reset_index()
-        df = df.loc[df["id_run"].isna()].groupby("id").first().reset_index()
-    else:
-        df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
-    list_df = []
-    for url, id_new in df[["url", "id"]].values:
-        if args.update:
-            id_run = DB.execute_sql(f"INSERT into estate_run (id_main, timestamp) VALUES ({id_new}, CURRENT_TIMESTAMP);SELECT lastval();")[0][0]
+    if args.rundetail:
+        if args.datefrom is None:
+            date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
         else:
-            id_run = None
-        try:
-            dict_ret = get_estate_detail(BASE_URL + url)
-        except (ConnectionResetError, requests.exceptions.ChunkedEncodingError) as e:
-            LOGGER.warning(f"{str(e)} happend.")
-            time.sleep(60)
-            continue
-        if isinstance(dict_ret, int):
+            date = datetime.datetime.fromisoformat(args.datefrom).strftime('%Y-%m-%d %H:%M:%S')
+        date_check_from = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
+        if args.skipsuccess:
+            df = DB.select_sql(
+                f"select main.id, main.url, sub.id as id_run, main.sys_updated from estate_main as main " + 
+                f"left join estate_run as sub on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date_check_from}' " + 
+                f"where main.sys_updated >= '{date}';"
+            )
+            df = df.sort_values(["id", "id_run"]).groupby("id").last().reset_index()
+            df = df.loc[df["id_run"].isna()].groupby("id").first().reset_index()
+        else:
+            df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
+        list_df = []
+        for url, id_new in df[["url", "id"]].values:
             if args.update:
-                DB.execute_sql(f"update estate_run set is_success = true where id = {id_run};")
-            continue
-        df_detail = pd.Series(dict_ret, dtype=object).reset_index()
-        df_detail.columns = ["key", "value"]
-        # register mst key
-        if df_detail.shape[0] > 0 and args.update:
-            df_key    = DB.select_sql("select id, name as key from estate_mst_key where name in ('" + "','".join(df_detail["key"].unique().tolist())+ "');")
-            df_detail = pd.merge(df_detail, df_key, how="left", on="key")
-            if df_detail["id"].isna().sum() > 0:
-                df_insert = pd.DataFrame(df_detail.loc[df_detail["id"].isna(), "key"].unique(), columns=["name"])
-                DB.insert_from_df(df_insert, "estate_mst_key", is_select=False)
+                id_run = DB.execute_sql(f"INSERT into estate_run (id_main, timestamp) VALUES ({id_new}, CURRENT_TIMESTAMP);SELECT lastval();")[0][0]
+            else:
+                id_run = None
+            try:
+                dict_ret = get_estate_detail(BASE_URL + url)
+            except (ConnectionResetError, requests.exceptions.ChunkedEncodingError) as e:
+                LOGGER.warning(f"{str(e)} happend.")
+                time.sleep(60)
+                continue
+            if isinstance(dict_ret, int):
+                if args.update:
+                    DB.execute_sql(f"update estate_run set is_success = true where id = {id_run};")
+                continue
+            df_detail = pd.Series(dict_ret, dtype=object).reset_index()
+            df_detail.columns = ["key", "value"]
+            # register mst key
+            if df_detail.shape[0] > 0 and args.update:
+                df_key    = DB.select_sql("select id, name as key from estate_mst_key where name in ('" + "','".join(df_detail["key"].unique().tolist())+ "');")
+                df_detail = pd.merge(df_detail, df_key, how="left", on="key")
+                if df_detail["id"].isna().sum() > 0:
+                    df_insert = pd.DataFrame(df_detail.loc[df_detail["id"].isna(), "key"].unique(), columns=["name"])
+                    DB.insert_from_df(df_insert, "estate_mst_key", is_select=False)
+                    DB.execute_sql()
+                df_key    = DB.select_sql("select id as id_key, name as key from estate_mst_key where name in ('" + "','".join(df_detail["key"].unique().tolist())+ "');")
+                df_detail = pd.merge(df_detail, df_key, how="left", on="key")
+            # insert
+            df_detail["id_run"]  = id_run
+            if df_detail.shape[0] > 0 and args.update:
+                df_prev_run = DB.select_sql(f"select * from estate_run where id_main = {id_new} and timestamp >= '{date_check_from}';")
+                df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +") and id_key in (" + ",".join(df_detail["id_key"].astype(str).tolist()) + ");")
+                df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_run", "id_key"])
+                df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
+                DB.insert_from_df(df_detail[["id_run", "id_key", "value"]], "estate_detail", is_select=False)
+                DB.set_sql(f"update estate_run set is_success = true where id = {id_run};")
                 DB.execute_sql()
-            df_key    = DB.select_sql("select id as id_key, name as key from estate_mst_key where name in ('" + "','".join(df_detail["key"].unique().tolist())+ "');")
-            df_detail = pd.merge(df_detail, df_key, how="left", on="key")
-        # insert
-        df_detail["id_run"]  = id_run
-        if df_detail.shape[0] > 0 and args.update:
-            df_prev_run = DB.select_sql(f"select * from estate_run where id_main = {id_new} and timestamp >= '{date_check_from}';")
-            df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +") and id_key in (" + ",".join(df_detail["id_key"].astype(str).tolist()) + ");")
-            df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_run", "id_key"])
-            df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
-            DB.insert_from_df(df_detail[["id_run", "id_key", "value"]], "estate_detail", is_select=False)
-            DB.set_sql(f"update estate_run set is_success = true where id = {id_run};")
-            DB.execute_sql()

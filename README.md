@@ -181,7 +181,16 @@ sudo docker exec --user=postgres psgre pg_restore -U postgres -a -d estate -Fc /
 vi ~/kkestate/kkestate/config/psgre.py
 ```
 
+### Cron
+
+```bash
+cat ~/kkestate/main/crontab | sudo tee -a /etc/crontab
+sudo /etc/init.d/cron restart
+```
+
+### Test
+
 ```bash
 cd ~/kkestate/main/
-nohup python suumo.py --update --updateurls &
+bash monitor.sh 1
 ```
