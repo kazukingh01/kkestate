@@ -157,7 +157,7 @@ def get_estate_detail(url):
                 dict_ret = dict_ret | {x:y for x, y in zip(_key, _val)}
             else:
                 dict_ret[title] = re.sub(r"[\t\n\r\f]+", r"\t", soupwk.find_next("div", class_="mt10").text.strip()) 
-    dict_ret = {x: re.sub(r"[\t\n\r\f]+", r"\t", y).replace("\xa0", "") for x, y in dict_ret.items()} # again
+    dict_ret = {x: re.sub(r"[\t\n\r\f]+", r"\t", y).replace("\xa0", "").replace("'", "") for x, y in dict_ret.items()} # again
     return dict_ret
 
 
