@@ -11,14 +11,24 @@ if [ -z "$NUM" ]; then
     exit 1
 fi
 
-mkdir -p ${LOGDIR}
 DATE1=$(date +%Y%m)
 DAY=$(date +%d)
-if [ "$DAY" -lt 15 ]; then
-  DATE2="${DATE1}01"
+DATE2=$2
+if [ -z "$DATE2" ]; then
+    if [ "$DAY" -lt 15 ]; then
+    DATE2="${DATE1}01"
+    else
+    DATE2="${DATE1}15"
+    fi
 else
-  DATE2="${DATE1}15"
+    if [[ ${DATE2} =~ ^[0-9]{8}$ ]]; then
+        :
+    else   
+        echo "wrong date ${DATE2}"
+        exit 1
+    fi
 fi
+echo "set date ${DATE2}"
 
 if [ $NUM -eq 1 ]; then
     LOGFILE="${LOGDIR}run_updateurls.`date "+%Y%m%d"`.log"
@@ -35,6 +45,7 @@ else
 fi
 
 if ! ps aux | grep -v grep | grep python | grep "${COMMAND}" > /dev/null; then
+    mkdir -p ${LOGDIR}
     echo "Process: ${COMMAND} not found! Restarting..."
     pkill python
     touch ${LOGFILE}
