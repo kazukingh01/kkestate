@@ -267,6 +267,7 @@ if __name__ == "__main__":
                 df_prev     = df_prev.loc[:, ["id_key", "value_prev"]]
                 df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_key"])
                 df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
-                DB.insert_from_df(df_detail[["id_run", "id_key", "value"]], "estate_detail", is_select=False)
+                if df_detail.shape[0] > 0:
+                    DB.insert_from_df(df_detail[["id_run", "id_key", "value"]], "estate_detail", is_select=False)
                 DB.set_sql(f"update estate_run set is_success = true where id = {id_run};")
                 DB.execute_sql()
