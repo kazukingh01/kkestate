@@ -223,7 +223,7 @@ if __name__ == "__main__":
         if args.skipsuccess:
             df = DB.select_sql(
                 f"select main.id, main.url, sub.id as id_run, main.sys_updated from estate_main as main " + 
-                f"left join estate_run as sub on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date_check_from}' " + 
+                f"left join estate_run as sub on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date}' " + 
                 f"where main.sys_updated >= '{date}';"
             )
             df = df.sort_values(["id", "id_run"]).groupby("id").last().reset_index()
