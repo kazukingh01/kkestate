@@ -261,8 +261,9 @@ if __name__ == "__main__":
             # insert
             df_detail["id_run"]  = id_run
             if df_detail.shape[0] > 0 and args.update:
-                df_prev_run = DB.select_sql(f"select * from estate_run where id_main = {id_new} and timestamp >= '{date_check_from}';")
-                df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +") and id_key in (" + ",".join(df_detail["id_key"].astype(str).tolist()) + ");")
+                df_prev_run = DB.select_sql(f"select id from estate_run where id_main = {id_new} and timestamp >= '{date_check_from}' and is_success = true;")
+                df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +");")
+                df_prev     = df_prev.sort_values(["id_key", "id_run"]).groupby(["id_key", "id_run"]).last()
                 df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_run", "id_key"])
                 df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
                 DB.insert_from_df(df_detail[["id_run", "id_key", "value"]], "estate_detail", is_select=False)
