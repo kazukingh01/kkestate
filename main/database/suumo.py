@@ -262,11 +262,12 @@ if __name__ == "__main__":
             df_detail["id_run"]  = id_run
             if df_detail.shape[0] > 0 and args.update:
                 df_prev_run = DB.select_sql(f"select id from estate_run where id_main = {id_new} and timestamp >= '{date_check_from}' and is_success = true;")
-                df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +");")
-                df_prev     = df_prev.sort_values(["id_key", "id_run"]).reset_index(drop=True).groupby("id_key").last().reset_index(drop=False)
-                df_prev     = df_prev.loc[:, ["id_key", "value_prev"]]
-                df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_key"])
-                df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
+                if df_prev_run.shape[0] > 0:
+                    df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +");")
+                    df_prev     = df_prev.sort_values(["id_key", "id_run"]).reset_index(drop=True).groupby("id_key").last().reset_index(drop=False)
+                    df_prev     = df_prev.loc[:, ["id_key", "value_prev"]]
+                    df_detail   = pd.merge(df_detail, df_prev, how="left", on=["id_key"])
+                    df_detail   = df_detail.loc[df_detail["value_prev"].isna() | (df_detail["value_prev"] != df_detail["value"])]
                 if df_detail.shape[0] > 0:
                     DB.insert_from_df(df_detail[["id_run", "id_key", "value"]], "estate_detail", is_select=False)
                 DB.set_sql(f"update estate_run set is_success = true where id = {id_run};")
