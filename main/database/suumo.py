@@ -90,7 +90,7 @@ def get_estate_detail(url):
     assert isinstance(url, str)
     url  = f"{url}property/" if url[-1] == "/" else f"{url}/property/"
     LOGGER.info(url)
-    html = requests.get(url, timeout=1)
+    html = requests.get(url, timeout=3)
     if html.status_code in [503]:
         LOGGER.warning(f"STATUS CODE: {html.status_code}")
         return -1
@@ -240,7 +240,7 @@ if __name__ == "__main__":
                 dict_ret = get_estate_detail(BASE_URL + url)
             except (ConnectionResetError, requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError) as e:
                 LOGGER.warning(f"{str(e)} happend.")
-                time.sleep(60)
+                time.sleep(10)
                 continue
             if isinstance(dict_ret, int):
                 if args.update:
