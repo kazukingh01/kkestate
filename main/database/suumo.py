@@ -90,7 +90,7 @@ def get_estate_detail(url):
     assert isinstance(url, str)
     url  = f"{url}property/" if url[-1] == "/" else f"{url}/property/"
     LOGGER.info(url)
-    html = requests.get(url)
+    html = requests.get(url, verify=False)
     if html.status_code in [503]:
         LOGGER.warning(f"STATUS CODE: {html.status_code}")
         return -1
