@@ -1,0 +1,23 @@
+[project] 
+name = "kkestate"
+version = "1.2.0"
+requires-python = ">= 3.12.8"
+description = "Collecting real estate data for using it parsonaly."
+dependencies = [
+    'kkpsgre @ git+https://github.com/kazukingh01/kkpsgre.git@893ec74a50904a891323e58876e06dfec3491ea2',
+    'kkdf @ git+https://github.com/kazukingh01/kkdf.git@cb478f2a1ee3811eae6d6c1d612087907f21c0cb',
+    'pandas==2.2.3',
+    'numpy==2.2.1',
+    'polars==1.18.0',
+    'pyarrow==19.0.1',
+    'requests==2.32.3',
+    'beautifulsoup4==4.12.3',
+    'joblib==1.4.2',
+]
+
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["kkestate"]
