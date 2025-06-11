@@ -178,7 +178,7 @@ if __name__ == "__main__":
     if args.updateurls:
         list_urls = []
         for x in LIST_MST_URLS:
-            for _ in range(5):
+            for _ in range(20):
                 url  = get_url_ichiran(x)
                 time.sleep(1)
                 html = requests.get(url)
@@ -186,7 +186,7 @@ if __name__ == "__main__":
                 if len(soup.find_all("div", class_="error_pop")) == 0:
                     break
                 LOGGER.warning(f"Web page might be busy. Try again.")
-                time.sleep(2)
+                time.sleep(5)
             if len(soup.find_all("div", class_="error_pop")) > 0: continue
             if soup.find("ol", class_="pagination-parts") is not None:
                 list_page = int([x.text for x in soup.find("ol", class_="pagination-parts").find_all("li")][-1])

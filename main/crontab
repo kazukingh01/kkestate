@@ -1,20 +1,16 @@
-0  0  1,15  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 1
-0  0  2,16  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 2
-0  0  3,17  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 2
-0  0  4,18  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  0  5,19  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  0  6,20  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  0  7,21  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  0  8,22  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  0  9,23  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  0  10,24 * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 2,16  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 2
-0  12 3,17  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 2
-0  12 4,18  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 5,19  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 6,20  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 7,21  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 8,22  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 9,23  * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  12 10,24 * * ubuntu  bash /home/ubuntu/kkestate/main/database/monitor.sh 3
-0  0  *     * * ubuntu  /home/ubuntu/venv/bin/python /home/ubuntu/kkestate/main/log/remove.py --path /home/ubuntu/kkestate/main/log/*YYYYMMDD.log --rm --ut `date "+\%Y\%m\%d" --date '31 day ago'`
+PYTHONPATH=/home/ubuntu/venv/bin
+DIRBASE=/home/ubuntu/kkestate
+# !!! environment variable !!! must be not used in below "PATH". x ${PYTHONPATH}:/usr/local/nvi... o /root/master/bin:/usr/local/nvi...
+PATH=/home/ubuntu/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0    0   1,11,21 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 1
+0    0   2,12,22 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 2
+0    12  2,12,22 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 2
+*/10 *   3,13,23 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+*/10 *   4,14,24 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+*/10 *   5,15,25 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+*/10 *   6,16,26 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+*/10 *   7,17,27 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+*/10 *   8,18,28 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+*/10 *   9,19,29 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+0    0   *       * * ubuntu  ${PYTHONPATH}/kklogrm --rm --path ${DIRBASE}/main/log/\*YYYYMMDD.log --fr 20010101 --to `date "+\%Y\%m\%d" --date '31 day ago'`

@@ -15,10 +15,12 @@ DATE1=$(date +%Y%m)
 DAY=$(date +%d)
 DATE2=$2
 if [ -z "$DATE2" ]; then
-    if [ "$DAY" -lt 15 ]; then
+    if [ "$DAY" -lt 11 ]; then
     DATE2="${DATE1}01"
+    elif [ "$DAY" -lt 21 ]; then
+    DATE2="${DATE1}11"
     else
-    DATE2="${DATE1}15"
+    DATE2="${DATE1}21"
     fi
 else
     if [[ ${DATE2} =~ ^[0-9]{8}$ ]]; then

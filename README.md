@@ -68,6 +68,10 @@ sudo docker exec --user=postgres postgres createdb --encoding=UTF8 --locale=ja_J
 sudo docker exec --user=postgres postgres pg_restore -d estate /home/share/db_YYYYMMDD.dump
 ```
 
+### Add user "guest"
+
+see: [Add user "guest"](https://github.com/kazukingh01/kkpsgre/tree/2d66939e01ea81ae6b255448a80875a589b8e376?tab=readme-ov-file#add-guest-user)
+
 # Run
 
 ### Set config
@@ -79,6 +83,7 @@ vi ~/kkestate/kkestate/config/psgre.py
 ### Cron
 
 ```bash
+sudo cp /etc/crontab /etc/crontab.`date "+%Y%m%d%H%M%S"`
 cat ~/kkestate/main/crontab | sudo tee -a /etc/crontab
 sudo /etc/init.d/cron restart
 ```
@@ -86,6 +91,6 @@ sudo /etc/init.d/cron restart
 ### Test
 
 ```bash
-cd ~/kkestate/main/database/
-bash monitor.sh 1
+source ~/venv/bin/activate
+bash ~/kkestate/main/database/monitor.sh 1
 ```
