@@ -60,6 +60,14 @@ sudo docker exec --user=postgres postgres createdb --encoding=UTF8 --locale=ja_J
 sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.estate.sql 
 ```
 
+### Restore Database
+
+```bash
+sudo docker exec --user=postgres postgres dropdb estate
+sudo docker exec --user=postgres postgres createdb --encoding=UTF8 --locale=ja_JP.utf8 --template=template0 estate
+sudo docker exec --user=postgres postgres pg_restore -d estate /home/share/db_YYYYMMDD.dump
+```
+
 # Run
 
 ### Set config

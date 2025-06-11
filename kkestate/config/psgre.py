@@ -5,8 +5,9 @@ __all__ = [
     "PASS",
 ]
 
-HOST = "127.0.0.1"
-PORT = 5432
-USER = "postgres"
-PASS = "postgres"
+HOST   = "172.17.0.2"
+PORT   = 5432
+USER   = "postgres"
+PASS   = "postgres"
 DBNAME = "estate"
+DBTYPE = "psgre"
