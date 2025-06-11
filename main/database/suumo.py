@@ -1,8 +1,8 @@
 import bs4, re, argparse, requests, datetime, time, copy
 import pandas as pd
-from kkpsgre.psgre import Psgre
-from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME
-from kkestate.util.logger import set_logger
+from kkpsgre.connector import DBConnector
+from kklogger import set_logger
+from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
 
 
 LOGGER    = set_logger(__name__)
@@ -172,15 +172,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # connection
-    DB = Psgre(f"host={HOST} port={PORT} dbname={DBNAME} user={USER} password={PASS}", max_disp_len=200)
+    DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
 
     # get url list
     if args.updateurls:
         list_urls = []
         for x in LIST_MST_URLS:
-            url = get_url_ichiran(x)
-            html = requests.get(url)
-            soup = bs4.BeautifulSoup(html.content, 'html.parser')
+            for _ in range(5):
+                url  = get_url_ichiran(x)
+                time.sleep(1)
+                html = requests.get(url)
+                soup = bs4.BeautifulSoup(html.content, 'html.parser')
+                if len(soup.find_all("div", class_="error_pop")) == 0:
+                    break
+                LOGGER.warning(f"Web page might be busy. Try again.")
+                time.sleep(2)
             if len(soup.find_all("div", class_="error_pop")) > 0: continue
             if soup.find("ol", class_="pagination-parts") is not None:
                 list_page = int([x.text for x in soup.find("ol", class_="pagination-parts").find_all("li")][-1])

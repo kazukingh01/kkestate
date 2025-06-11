@@ -1,9 +1,9 @@
 #!/bin/bash
 
-HOMEDIR="/home/ubuntu"
-LOGDIR="${HOMEDIR}/kkestate/main/log/"
-MODULE="${HOMEDIR}/kkestate/main/database/suumo.py"
-PYTHON="${HOMEDIR}/venv/bin/python"
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+LOGDIR="../log/"
+MODULE="./suumo.py"
 
 NUM=$1
 if [ -z "$NUM" ]; then
@@ -49,7 +49,7 @@ if ! ps aux | grep -v grep | grep python | grep "${COMMAND}" > /dev/null; then
     echo "Process: ${COMMAND} not found! Restarting..."
     pkill python
     touch ${LOGFILE}
-    nohup ${PYTHON} ${COMMAND} >> ${LOGFILE} 2>&1 &
+    nohup python ${COMMAND} >> ${LOGFILE} 2>&1 &
 else
     echo "Process: ${COMMAND} is running."
 fi

@@ -35,6 +35,12 @@ git clone https://github.com/kazukingh01/kkestate.git
 pip install -e ~/kkestate/
 ```
 
+### Copy files
+
+```bash
+cp ~/kkestate/main/database/schema.sql /home/share/schema.estate.sql
+```
+
 # Database
 
 Make PostgreSQL container.
@@ -51,8 +57,7 @@ see: [Install ( Docker Hub Base )](https://github.com/kazukingh01/kkpsgre/tree/8
 ```bash
 sudo docker exec --user=postgres postgres dropdb estate
 sudo docker exec --user=postgres postgres createdb --encoding=UTF8 --locale=ja_JP.utf8 --template=template0 estate
-cp ~/kkestate/main/database/schema.sql /home/share/
-sudo docker exec --user=postgres psgre psql -U postgres -d estate -f /home/share/schema.sql 
+sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.estate.sql 
 ```
 
 # Run
