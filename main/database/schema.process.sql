@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS estate_mst_cleaned (
     id SMALLINT NOT NULL,
     name TEXT NOT NULL,
-    type TEXT,
+    type JSON,
     PRIMARY KEY (id)
 );
 
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS estate_cleaned (
     id_run BIGINT NOT NULL,
     id_key SMALLINT NOT NULL,
     id_cleaned SMALLINT NOT NULL,
-    value_cleaned TEXT,
+    value_cleaned JSON,
     PRIMARY KEY (id_run, id_key),
     FOREIGN KEY (id_run) REFERENCES estate_run(id),
     FOREIGN KEY (id_key) REFERENCES estate_mst_key(id),
