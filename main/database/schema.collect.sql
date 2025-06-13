@@ -90,6 +90,7 @@ ALTER SEQUENCE public.estate_main_id_seq OWNED BY public.estate_main.id;
 
 CREATE TABLE public.estate_mst_key (
     id smallint NOT NULL,
+    id_cleaned smallint,
     name text NOT NULL,
     sys_updated timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

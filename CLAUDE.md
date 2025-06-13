@@ -162,6 +162,59 @@ pip install -e .
 
 `./README.md` に記述あり.
 
+### Python
+
+#### Class/Function
+
+IMPORTANT: モジュール（テストスクリプトも含む）を横断して使われるような共通的な関数やクラスは、repository 名と同じディレクトリ配下の箇所に適切に書いて整理して.
+IMPORTANT: モジュール内でしか使われない関数やクラスは、そのモジュール内で定義して使って.
+
+#### Main
+
+NEVER: main() プロセスは書かない.
+IMPORTANT: 以下のように `if __name__ == "__main__":` からはじめ、argparse で引数を設定できるようにする. その際、database の update の処理が入る場合は、`update` flg を持たせる事.
+
+```python
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--updateurls",  action='store_true', default=False)
+    parser.add_argument("--update",      action='store_true', default=False)
+    parser.add_argument("--runmain",     action='store_true', default=False)
+    parser.add_argument("--rundetail",   action='store_true', default=False)
+    parser.add_argument("--skipsuccess", action='store_true', default=False)
+    parser.add_argument("--datefrom",    type=str, help="--datefrom 20230101", required=False)
+```
+
+#### Logger
+
+NEVER: log は基本実行シェルを nohup で起動して log にするので、python内部で log を生成する処理は書かない.
+IMPORTANT: logger は下記の方法で `main/` と `test` 内の各モジュールで実装される事. 
+
+```python
+# Import
+from kklogger import set_logger
+LOGGER = set_logger(__name__)
+# How to use
+LOGGER.info(f"test code.")
+```
+
+#### Database
+
+```python
+# Import
+from kkpsgre.connector import DBConnector
+from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
+# Connection
+DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
+# Select
+df: pd.DataFrame = DB.select_sql("select * from tabel_name limit 100;")
+print(df)
+# Insert
+DB.insert_from_df(df, "table_name", is_select=True)
+# 汎用実行SQL
+DB.execute_sql(f"update estate_run set is_success = true where id = {id_run};")
+```
+
 ## Architecture
 
 ### System Design
@@ -222,7 +275,11 @@ flowchart RL
     9. 詳細情報は `estate_detail` に記録され、その際、`estate_mst_key` で管理される `id` に置き換えて記録される. ただし、前回記録されたデータと `key` と `value` 単位で同じデータであった場合、その項目は記録されない. 要は差異がある場合のみ記録される仕組みになっている.
     10. 正しく記録できた場合は、`estate_run` の `is_success` を true にする.
 2. PROCESS
-  未実装
+    1. `estate_run` と `estate_detail` から未クレンジングのデータを取得する.
+    2. `estate_mst_key` の `name` を元に、適切なクレンジング済み項目名を `estate_mst_cleaned` に登録し、`estate_mst_key.id_cleaned` に紐づける.
+    3. 各物件の詳細情報を解析し、価格、間取り、住所などの項目を抽出・正規化する.
+    4. クレンジング済みのデータを `estate_cleaned` テーブルに `estate_detail` と同じ構造で保存する.
+    5. `estate_cleaned` は `id_run`, `id_key`, `id_cleaned`, `value_cleaned` の4カラム構成で、`value_cleaned` にはJSON文字列形式でクレンジング済み値を保存する.
 3. ANALYZE
   未実装
 4. WEB
@@ -232,7 +289,7 @@ flowchart RL
 
 ### Database Schema
 
-プロジェクトでは以下の5つのテーブルを使用している：
+プロジェクトでは以下の7つのテーブルを使用している：
 
 1. **`estate_tmp`** - 一時的なURL管理テーブル
    - `url` (text, NOT NULL): スクレイピング対象のURL
@@ -242,7 +299,7 @@ flowchart RL
 2. **`estate_main`** - 物件の基本情報テーブル
    - `id` (bigint, NOT NULL, PK): 自動採番ID
    - `name` (text): 物件名
-   - `url` (text, NOT NULL): 物件詳細ページのURL（一意）
+   - `url` (text, NOT NULL, UNIQUE): 物件詳細ページのURL（一意）
    - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
 
 3. **`estate_run`** - 実行履歴管理テーブル
@@ -253,13 +310,26 @@ flowchart RL
 
 4. **`estate_mst_key`** - 項目名マスタテーブル
    - `id` (smallint, NOT NULL, PK): 自動採番ID
-   - `name` (text, NOT NULL): 項目名（スクレイピングで取得されるキー）
+   - `name` (text, NOT NULL, UNIQUE): 項目名（スクレイピングで取得されるキー）
    - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
+   - `id_cleaned` (smallint): estate_mst_cleanedのIDへの参照
 
-5. **`estate_detail`** - 物件詳細情報テーブル
+5. **`estate_mst_cleaned`** - クレンジング済み項目名マスタテーブル
+   - `id` (smallint, NOT NULL, PK): 自動採番ID
+   - `name` (text, NOT NULL): クレンジング済み項目名
+
+6. **`estate_detail`** - 物件詳細情報テーブル
    - `id_run` (bigint, NOT NULL): estate_runのIDへの参照
    - `id_key` (smallint, NOT NULL): estate_mst_keyのIDへの参照
    - `value` (text): 項目の値（スクレイピングで取得される生データ）
+   - 複合主キー: (id_run, id_key)
+
+7. **`estate_cleaned`** - クレンジング済みデータテーブル
+   - `id_run` (bigint, NOT NULL): estate_runのIDへの参照
+   - `id_key` (smallint, NOT NULL): estate_mst_keyのIDへの参照
+   - `id_cleaned` (smallint, NOT NULL): estate_mst_cleanedのIDへの参照
+   - `value_cleaned` (text): クレンジング済みの値
+   - 複合主キー: (id_run, id_key)
 
 ### External Services
 
@@ -353,8 +423,17 @@ IMPORTANT: テスト用のコードは `test/*` に書いて.
 
 ## Important Notes
 
-### Database
+### IMPORTANT: Record sessions
 
+IMPORTANT: 
+- 実行した内容について、「どんな経緯で」「何を目的に」「どんな実装をしたか」「結果どうだったか」を、後日あなたが見返した時に過去に何があったかを詳細に把握できるように記載する必要がある.
+- `./claude/sessions/YYYYMMDD.md` 形式で、実装が発生した場合は都度内容を更新する. 
+- IMPORTANT: この内容はいちいち指示しないため、あなたのタイミングでこまめに記録しなければならいあ.
+- session 開始時は `./claude/sessions/*` を見て過去何があったかを把握しなければならない.
+
+### IMPORTANT: Database
+
+IMPORTANT: 
 - データのSELECT には必ず LIMIT をつける事. LIMIT 100 でまずは様子をみつつ、その取得時間が10秒以内である場合は、LIMIT を x5 ずつして許容量を上げていく. 基本的にクエリは 10秒以内に終了される事.
 - 初手の JOINS は避ける. まずは LIMIT をつけて単体のテーブルデータを確認する事.
 - 複雑な JOIN クエリは避ける事。なるべくシンプルなSQLを組み合わせて python モジュールの中で joins させるなどする.
