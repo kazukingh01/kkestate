@@ -25,13 +25,35 @@ NEVER: 「->」は使用禁止.「->」で代用する.
 このプロジェクトで用いられる技術スタックは以下. 
 
 - Python
-- React
+- React（未実装）
 - Database ( PostgreSQL )
 - Cron
 - Docker
 
 この環境とは別に、Virtual Private Server ( VPS ) 上で既にデータスクレイピング処理が動いている.
 VPSのホスト側でCron起動されたPythonが常時実行され、Docker container として起動している PostgreSQL に読み書きを行っている.
+
+#### Python Dependencies
+
+`pyproject.toml` で管理される主要な依存パッケージ：
+
+**データベース関連**
+- `kkpsgre`: PostgreSQL操作用のカスタムライブラリ
+- 使用目的: データベース接続、クエリ実行
+
+**データ処理関連**
+- `kkdf`: データフレーム処理用のカスタムライブラリ
+- `pandas==2.2.3`: データ分析・操作
+- `numpy==2.2.1`: 数値計算
+- `polars==1.18.0`: 高速データフレーム処理
+- `pyarrow==19.0.1`: 列指向データ処理
+
+**ウェブスクレイピング関連**
+- `requests==2.32.3`: HTTP リクエスト
+- `beautifulsoup4==4.12.3`: HTML/XML パース
+
+**並列処理関連**
+- `joblib==1.4.2`: 並列計算・キャッシュ
 
 ### Key Features
 
@@ -189,16 +211,16 @@ flowchart RL
 ### Data Flow
 
 1. COLLECT
-  1. `estate_tmp` をクリアする.
-  2. `SUUMO` には大項目としての「都道府県」や「新築/中古」などの項目があり、そのページには各物件が何ページにも渡ってリスト化されている. まずはそれらページに直接アクセスできるようなURL_Aを編集作成し、`estate_tmp` に書き込む.
-  3. `estate_tmp` から `is_checked = false` な URL_A を参照し、そのページにリスト化されている物件の詳細情報を取得するための URL_B を抽出する.
-  4. URA_A ページにある各物件について情報を取得できた場合は、`estate_tmp` の該当レコードの `is_checked` を true にする.
-  5. ある URL_B は1物件に対して一意であるとし、`estate_main` に URL_B が存在しない場合は URL_B の情報を書き込む. 存在する場合は、`sys_updated` のみが update される. この処理において、URL_B と一意に対応する `id` は自動採番される.
-  6. `estate_main` の情報を取得し、各物件の詳細情報を URL_B から取得する. 
-  7. 各物件の詳細情報の取得可否については `estate_run` で管理され、詳細情報取得処理が走れば `estate_run` にレコードが追加される. `estate_run` の `id` は自動採番される.
-  8. 詳細情報は `key` と `value` で保持され、それらはピュアにスクレイピングされたテキスト情報であり、未クレンジングな状態である. `key` の名前は `estate_mst_key` で管理され、新規の名前の場合は登録され、`id` が自動採番される.
-  9. 詳細情報は `estate_detail` に記録され、その際、`estate_mst_key` で管理される `id` に置き換えて記録される. ただし、前回記録されたデータと `key` と `value` 単位で同じデータであった場合、その項目は記録されない. 要は差異がある場合のみ記録される仕組みになっている.
-  10. 正しく記録できた場合は、`estate_run` の `is_success` を true にする.
+    1. `estate_tmp` をクリアする.
+    2. `SUUMO` には大項目としての「都道府県」や「新築/中古」などの項目があり、そのページには各物件が何ページにも渡ってリスト化されている. まずはそれらページに直接アクセスできるようなURL_Aを編集作成し、`estate_tmp` に書き込む.
+    3. `estate_tmp` から `is_checked = false` な URL_A を参照し、そのページにリスト化されている物件の詳細情報を取得するための URL_B を抽出する.
+    4. URA_A ページにある各物件について情報を取得できた場合は、`estate_tmp` の該当レコードの `is_checked` を true にする.
+    5. ある URL_B は1物件に対して一意であるとし、`estate_main` に URL_B が存在しない場合は URL_B の情報を書き込む. 存在する場合は、`sys_updated` のみが update される. この処理において、URL_B と一意に対応する `id` は自動採番される.
+    6. `estate_main` の情報を取得し、各物件の詳細情報を URL_B から取得する. 
+    7. 各物件の詳細情報の取得可否については `estate_run` で管理され、詳細情報取得処理が走れば `estate_run` にレコードが追加される. `estate_run` の `id` は自動採番される.
+    8. 詳細情報は `key` と `value` で保持され、それらはピュアにスクレイピングされたテキスト情報であり、未クレンジングな状態である. `key` の名前は `estate_mst_key` で管理され、新規の名前の場合は登録され、`id` が自動採番される.
+    9. 詳細情報は `estate_detail` に記録され、その際、`estate_mst_key` で管理される `id` に置き換えて記録される. ただし、前回記録されたデータと `key` と `value` 単位で同じデータであった場合、その項目は記録されない. 要は差異がある場合のみ記録される仕組みになっている.
+    10. 正しく記録できた場合は、`estate_run` の `is_success` を true にする.
 2. PROCESS
   未実装
 3. ANALYZE
@@ -207,6 +229,37 @@ flowchart RL
   未実装
 
 ### Key Components
+
+### Database Schema
+
+プロジェクトでは以下の5つのテーブルを使用している：
+
+1. **`estate_tmp`** - 一時的なURL管理テーブル
+   - `url` (text, NOT NULL): スクレイピング対象のURL
+   - `is_checked` (boolean, NOT NULL, default: false): 処理済みフラグ
+   - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
+
+2. **`estate_main`** - 物件の基本情報テーブル
+   - `id` (bigint, NOT NULL, PK): 自動採番ID
+   - `name` (text): 物件名
+   - `url` (text, NOT NULL): 物件詳細ページのURL（一意）
+   - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
+
+3. **`estate_run`** - 実行履歴管理テーブル
+   - `id` (bigint, NOT NULL, PK): 自動採番ID
+   - `id_main` (bigint, NOT NULL): estate_mainのIDへの参照
+   - `is_success` (boolean, NOT NULL, default: false): 実行成功フラグ
+   - `timestamp` (timestamp): 実行日時
+
+4. **`estate_mst_key`** - 項目名マスタテーブル
+   - `id` (smallint, NOT NULL, PK): 自動採番ID
+   - `name` (text, NOT NULL): 項目名（スクレイピングで取得されるキー）
+   - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
+
+5. **`estate_detail`** - 物件詳細情報テーブル
+   - `id_run` (bigint, NOT NULL): estate_runのIDへの参照
+   - `id_key` (smallint, NOT NULL): estate_mst_keyのIDへの参照
+   - `value` (text): 項目の値（スクレイピングで取得される生データ）
 
 ### External Services
 
@@ -297,3 +350,11 @@ IMPORTANT: テスト用のコードは `test/*` に書いて.
 ### Common Issues
 
 ### Debug Tips
+
+## Important Notes
+
+### Database
+
+- データのSELECT には必ず LIMIT をつける事. LIMIT 100 でまずは様子をみつつ、その取得時間が10秒以内である場合は、LIMIT を x5 ずつして許容量を上げていく. 基本的にクエリは 10秒以内に終了される事.
+- 初手の JOINS は避ける. まずは LIMIT をつけて単体のテーブルデータを確認する事.
+- 複雑な JOIN クエリは避ける事。なるべくシンプルなSQLを組み合わせて python モジュールの中で joins させるなどする.
