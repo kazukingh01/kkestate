@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS estate_mst_cleaned (
     id SMALLINT NOT NULL,
     name TEXT NOT NULL,
+    type TEXT,
     PRIMARY KEY (id)
 );
 
