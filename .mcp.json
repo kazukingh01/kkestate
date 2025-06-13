@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "psqlmcp": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--network",
+        "host",
+        "mcp/postgres",
+        "postgresql://guest:guest@127.0.0.1:12345/estate"
+      ],
+      "env": {}
+    }
+  }
+}
