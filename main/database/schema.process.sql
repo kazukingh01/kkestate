@@ -5,6 +5,21 @@ CREATE TABLE IF NOT EXISTS estate_mst_cleaned (
     PRIMARY KEY (id)
 );
 
+-- estate_mst_cleaned用のシーケンス
+CREATE SEQUENCE IF NOT EXISTS estate_mst_cleaned_id_seq
+    AS smallint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+-- シーケンスの所有権設定
+ALTER SEQUENCE estate_mst_cleaned_id_seq OWNED BY estate_mst_cleaned.id;
+
+-- idカラムのデフォルト値設定
+ALTER TABLE estate_mst_cleaned ALTER COLUMN id SET DEFAULT nextval('estate_mst_cleaned_id_seq'::regclass);
+
 -- 項目名の一意性制約
 CREATE UNIQUE INDEX IF NOT EXISTS idx_estate_mst_cleaned_name ON estate_mst_cleaned(name);
 
