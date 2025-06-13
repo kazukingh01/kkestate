@@ -84,7 +84,7 @@ vi ~/kkestate/kkestate/config/psgre.py
 
 ```bash
 sudo cp /etc/crontab /etc/crontab.`date "+%Y%m%d%H%M%S"`
-cat ~/kkestate/main/crontab | sudo tee -a /etc/crontab
+cat ~/kkestate/main/others/crontab | sudo tee -a /etc/crontab
 sudo /etc/init.d/cron restart
 ```
 
@@ -92,5 +92,5 @@ sudo /etc/init.d/cron restart
 
 ```bash
 source ~/venv/bin/activate
-bash ~/kkestate/main/database/monitor.sh 1
+bash ~/kkestate/main/collect/monitor.sh 1
 ```

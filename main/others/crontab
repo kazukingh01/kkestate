@@ -3,15 +3,15 @@ DIRBASE=/home/ubuntu/kkestate
 # !!! environment variable !!! must be not used in below "PATH". x ${PYTHONPATH}:/usr/local/nvi... o /root/master/bin:/usr/local/nvi...
 PATH=/home/ubuntu/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-0    0   1,11,21 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 1
-0    0   2,12,22 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 2
-0    12  2,12,22 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 2
-*/10 *   2,12,22 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
-*/10 *   3,13,23 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
-*/10 *   4,14,24 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
-*/10 *   5,15,25 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
-*/10 *   6,16,26 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
-*/10 *   7,17,27 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
-*/10 *   8,18,28 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
-*/10 *   9,19,29 * * ubuntu  bash ${DIRBASE}/main/database/monitor.sh 3
+0    0   1,11,21 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 1
+0    0   2,12,22 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 2
+0    12  2,12,22 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 2
+*/10 *   2,12,22 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
+*/10 *   3,13,23 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
+*/10 *   4,14,24 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
+*/10 *   5,15,25 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
+*/10 *   6,16,26 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
+*/10 *   7,17,27 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
+*/10 *   8,18,28 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
+*/10 *   9,19,29 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
 0    0   *       * * ubuntu  ${PYTHONPATH}/kklogrm --rm --path ${DIRBASE}/main/log/\*YYYYMMDD.log --fr 20010101 --to `date "+\%Y\%m\%d" --date '31 day ago'`
