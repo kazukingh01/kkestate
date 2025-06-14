@@ -18,7 +18,10 @@ from kkestate.util.json_cleaner import (
     clean_access_to_json, clean_zoning_to_json, clean_force_null_to_json,
     clean_units_to_json, clean_price_band_to_json, clean_other_expenses_to_json,
     clean_multiple_area_to_json, clean_restrictions_to_json, clean_expiry_date_to_json,
-    clean_company_info_to_json, clean_delivery_date_to_json
+    clean_company_info_to_json, clean_delivery_date_to_json, clean_address_to_json,
+    generate_address_type_schema, generate_price_type_schema, generate_area_type_schema,
+    generate_layout_type_schema, generate_date_type_schema, generate_access_type_schema,
+    generate_boolean_type_schema, generate_number_type_schema, generate_text_type_schema
 )
 from kkestate.util.cleansing import (
     clean_price, clean_layout, clean_area, clean_access, 
@@ -66,6 +69,11 @@ class EstateProcessor:
             '会社情報': clean_company_info_to_json,
             '敷地権利形態': clean_force_null_to_json,
             '販売スケジュール': clean_force_null_to_json,
+            '所在地': clean_address_to_json,
+            '住所': clean_address_to_json,
+            '物件所在地': clean_address_to_json,
+            '現地案内所': clean_address_to_json,
+            'モデルルーム': clean_address_to_json,
         }
     
     def update_key_mapping(self, update_db: bool = False, limit_all: bool = False, specific_key_id: Optional[int] = None):

@@ -7,6 +7,7 @@ import re
 import json
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
+from .address_parser import parse_address_structure
 
 def _should_nullify_text(value: str) -> bool:
     """
@@ -1491,15 +1492,34 @@ def create_type_schema(base_key: str, sample_values: List[str]) -> Dict[str, Any
     # 期別情報を含むかチェック
     has_period = "_第" in base_key
     
+    # 住所関連の特殊処理
+    address_keywords = ["住所", "所在地", "物件所在地", "現地案内所", "モデルルーム", "アドレス"]
+    if any(keyword in base_key for keyword in address_keywords):
+        return generate_address_type_schema()
+    
+    # 価格関連の特殊処理
+    price_keywords = ["価格", "料金", "費用", "金額", "万円", "円"]
+    if any(keyword in base_key for keyword in price_keywords):
+        return generate_price_type_schema()
+    
+    # 面積関連の特殊処理
+    area_keywords = ["面積", "平米", "m²", "㎡", "坪"]
+    if any(keyword in base_key for keyword in area_keywords):
+        return generate_area_type_schema()
+    
+    # 間取り関連の特殊処理
+    layout_keywords = ["間取り", "LDK", "DK", "1R", "ワンルーム"]
+    if any(keyword in base_key for keyword in layout_keywords):
+        return generate_layout_type_schema()
+    
+    # 日付関連の特殊処理
+    date_keywords = ["時期", "年月", "完成", "竣工", "引渡", "築年", "建築年"]
+    if any(keyword in base_key for keyword in date_keywords):
+        return generate_date_type_schema()
+    
     # 交通アクセスの特殊処理
     if "交通" in base_key or "アクセス" in base_key:
-        return {
-            "base_type": "array",
-            "data_type": "access",
-            "fields": ["routes"],
-            "route_fields": ["line", "station", "method", "time"],
-            "period_aware": has_period
-        }
+        return generate_access_type_schema()
     
     # 用途地域の特殊処理
     if "用途地域" in base_key:
@@ -1585,52 +1605,888 @@ def create_type_schema(base_key: str, sample_values: List[str]) -> Dict[str, Any
                            for v in sample_values[:10] if v)
     has_date = any(re.search(r'\d{4}年', str(v)) for v in sample_values[:10] if v)
     
-    # 基本型を決定
+    # サンプルデータによる自動判定でも詳細なtype生成関数を使用
     if has_boolean_words and not has_numeric:
-        base_type = "boolean"
-        data_type = "boolean"
-        fields = ["value"]
+        return generate_boolean_type_schema()
     elif has_date:
-        base_type = "date"
-        data_type = "date"
-        fields = ["year", "month", "period_text", "estimated_date"]
+        return generate_date_type_schema()
     elif has_range and has_numeric:
-        base_type = "range"
         if "価格" in base_key or "費" in base_key:
-            data_type = "money"
-            fields = ["min", "max", "unit"]
+            return generate_price_type_schema()
         elif "面積" in base_key:
-            data_type = "area"
-            fields = ["min", "max", "unit", "tsubo", "measurement_type"]
+            return generate_area_type_schema()
         else:
-            data_type = "number"
-            fields = ["min", "max", "unit"]
+            return generate_number_type_schema()
     elif has_numeric and not has_range:
-        base_type = "single"
         if "価格" in base_key or "費" in base_key:
-            data_type = "money"
-            fields = ["value", "unit"]
+            return generate_price_type_schema()
         elif "面積" in base_key:
-            data_type = "area"
-            fields = ["value", "unit", "tsubo", "measurement_type"]
-        elif "戸数" in base_key or "階" in base_key:
-            data_type = "number"
-            fields = ["value", "unit"]
+            return generate_area_type_schema()
         else:
-            data_type = "number"
-            fields = ["value"]
+            return generate_number_type_schema()
     else:
-        base_type = "single"
-        data_type = "text"
-        fields = ["value"]
+        return generate_text_type_schema()
+
+def clean_address_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    住所情報をJSON形式でクレンジング
+    都道府県とその次の区分に分けて構造化
     
-    # 期別情報を追加
-    if has_period:
-        fields.append("period")
+    Args:
+        value (str): 住所の生データ
+        raw_key (str): 元のキー名
+        period (Optional[int]): 期別情報
+        
+    Returns:
+        Dict[str, Any]: 構造化された住所情報
+    """
+    if not value or value.strip() == "" or _should_nullify_text(value.strip()):
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
     
+    value = value.strip()
+    result = {}
+    
+    # 住所を構造化
+    parsed = parse_address_structure(value)
+    
+    if parsed:
+        result.update({
+            "raw": parsed["raw"],
+            "prefecture": parsed["prefecture"],
+            "secondary_division": parsed["secondary_division"],
+            "secondary_type": parsed["secondary_type"],
+            "tertiary_division": parsed["tertiary_division"],
+            "tertiary_type": parsed["tertiary_type"],
+            "remaining": parsed["remaining"]
+        })
+        
+        # 住所階層の文字列表現を追加
+        hierarchy = []
+        if parsed["prefecture"]:
+            hierarchy.append(parsed["prefecture"])
+        if parsed["secondary_division"]:
+            hierarchy.append(parsed["secondary_division"])
+        if parsed["tertiary_division"]:
+            hierarchy.append(parsed["tertiary_division"])
+        
+        result["hierarchy"] = " -> ".join(hierarchy)
+        
+        # 区分タイプの組み合わせ
+        division_types = []
+        if parsed["secondary_type"]:
+            division_types.append(parsed["secondary_type"])
+        if parsed["tertiary_type"]:
+            division_types.append(parsed["tertiary_type"])
+        
+        if division_types:
+            result["division_types"] = " -> ".join(division_types)
+    else:
+        # パースに失敗した場合は生データを保存
+        result["raw"] = value
+        result["parse_failed"] = True
+    
+    if period is not None:
+        result["period"] = period
+    
+    return result
+
+def generate_address_type_schema() -> Dict[str, Any]:
+    """
+    住所データ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 住所データ用のtype情報
+    """
     return {
-        "base_type": base_type,
-        "data_type": data_type,
-        "fields": fields,
-        "period_aware": has_period
+        "base_type": "structured_address",
+        "data_type": "object",
+        "required_fields": ["raw"],
+        "optional_fields": [
+            "prefecture", "secondary_division", "secondary_type", 
+            "tertiary_division", "tertiary_type", "remaining", 
+            "hierarchy", "division_types", "parse_failed", "period"
+        ],
+        "field_definitions": {
+            "raw": {
+                "type": "string", 
+                "description": "元の住所文字列（スクレイピング生データ）"
+            },
+            "prefecture": {
+                "type": "string", 
+                "description": "都道府県（東京都、北海道、○○府、○○県）"
+            },
+            "secondary_division": {
+                "type": "string", 
+                "description": "都道府県直下の区分（市区町村・郡・支庁等）"
+            },
+            "secondary_type": {
+                "type": "string", 
+                "enum": ["市", "区", "町", "村", "郡", "特別区", "支庁・振興局"],
+                "description": "第二レベル区分のタイプ"
+            },
+            "tertiary_division": {
+                "type": "string", 
+                "description": "第三レベル区分（郡配下の町村）"
+            },
+            "tertiary_type": {
+                "type": "string", 
+                "enum": ["町", "村"],
+                "description": "第三レベル区分のタイプ"
+            },
+            "remaining": {
+                "type": "string", 
+                "description": "残りの住所詳細（番地・建物名等）"
+            },
+            "hierarchy": {
+                "type": "string", 
+                "description": "行政区分の階層構造（例: 千葉県 -> 印旛郡 -> 酒々井町）"
+            },
+            "division_types": {
+                "type": "string", 
+                "description": "区分タイプの組み合わせ（例: 郡 -> 町）"
+            },
+            "parse_failed": {
+                "type": "boolean", 
+                "description": "住所解析に失敗した場合true"
+            },
+            "period": {
+                "type": "integer", 
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "東京都特別区",
+                "value": "東京都 -> 渋谷区"
+            },
+            {
+                "description": "郡制地域", 
+                "value": "千葉県 -> 印旛郡 -> 酒々井町"
+            },
+            {
+                "description": "政令指定都市",
+                "value": "神奈川県 -> 横浜市"
+            },
+            {
+                "description": "北海道",
+                "value": "北海道 -> 札幌市"
+            }
+        ],
+        "analysis_keys": {
+            "prefecture_grouping": {
+                "field": "prefecture",
+                "description": "都道府県別の集計・分析"
+            },
+            "administrative_type": {
+                "field": ["secondary_type", "tertiary_type"],
+                "description": "行政区分タイプ別の分析"
+            },
+            "hierarchy_analysis": {
+                "field": "hierarchy",
+                "description": "階層構造での分析"
+            },
+            "urban_rural_classification": {
+                "field": "division_types",
+                "description": "都市部・地方部の分類分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "都道府県別物件数",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.prefecture') as pref, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [address_id] GROUP BY pref"
+            },
+            {
+                "purpose": "行政区分タイプ別分析",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.secondary_type') as type, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [address_id] GROUP BY type"
+            },
+            {
+                "purpose": "階層構造での検索",
+                "sql": "SELECT * FROM estate_cleaned WHERE id_cleaned = [address_id] AND JSON_EXTRACT(value_cleaned, '$.hierarchy') LIKE '%東京都%'"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_price_type_schema() -> Dict[str, Any]:
+    """
+    価格データ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 価格データ用のtype情報
+    """
+    return {
+        "base_type": "range_or_single",
+        "data_type": "number",
+        "required_fields": ["period"],
+        "optional_fields": [
+            "min", "max", "value", "unit", "is_undefined", 
+            "tentative", "immediate_available", "note"
+        ],
+        "field_definitions": {
+            "min": {
+                "type": "number",
+                "description": "価格帯の最小値（万円単位）"
+            },
+            "max": {
+                "type": "number", 
+                "description": "価格帯の最大値（万円単位）"
+            },
+            "value": {
+                "type": "number",
+                "description": "単一価格（万円単位）"
+            },
+            "unit": {
+                "type": "string",
+                "enum": ["万円", "円", "千円", "億円"],
+                "description": "価格の単位"
+            },
+            "is_undefined": {
+                "type": "boolean",
+                "description": "価格未定の場合true"
+            },
+            "tentative": {
+                "type": "boolean",
+                "description": "予定価格の場合true"
+            },
+            "immediate_available": {
+                "type": "boolean",
+                "description": "即入居可の場合true"
+            },
+            "note": {
+                "type": "string",
+                "description": "追加情報・特記事項"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "価格帯", 
+                "value": {"min": 2685, "max": 3955, "unit": "万円", "period": 4}
+            },
+            {
+                "description": "単一価格",
+                "value": {"value": 3200, "unit": "万円", "period": 4}
+            },
+            {
+                "description": "価格未定",
+                "value": {"is_undefined": True, "period": 4}
+            },
+            {
+                "description": "予定価格",
+                "value": {"min": 3000, "max": 4000, "unit": "万円", "tentative": True, "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "price_range_analysis": {
+                "field": ["min", "max", "value"],
+                "description": "価格帯・単価の分析"
+            },
+            "unit_standardization": {
+                "field": "unit",
+                "description": "単位別の価格正規化"
+            },
+            "market_status": {
+                "field": ["is_undefined", "tentative"],
+                "description": "市場状況・販売ステータス分析"
+            },
+            "period_comparison": {
+                "field": "period",
+                "description": "期別価格動向分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "価格帯分析",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.min') as min_price, JSON_EXTRACT(value_cleaned, '$.max') as max_price FROM estate_cleaned WHERE id_cleaned = [price_id] AND JSON_EXTRACT(value_cleaned, '$.min') IS NOT NULL"
+            },
+            {
+                "purpose": "平均価格計算",
+                "sql": "SELECT AVG(CASE WHEN JSON_EXTRACT(value_cleaned, '$.value') IS NOT NULL THEN JSON_EXTRACT(value_cleaned, '$.value') ELSE (JSON_EXTRACT(value_cleaned, '$.min') + JSON_EXTRACT(value_cleaned, '$.max'))/2 END) as avg_price FROM estate_cleaned WHERE id_cleaned = [price_id]"
+            },
+            {
+                "purpose": "期別価格推移",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.period') as period, AVG(JSON_EXTRACT(value_cleaned, '$.value')) as avg_price FROM estate_cleaned WHERE id_cleaned = [price_id] GROUP BY period ORDER BY period"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_area_type_schema() -> Dict[str, Any]:
+    """
+    面積データ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 面積データ用のtype情報
+    """
+    return {
+        "base_type": "range_or_single",
+        "data_type": "number",
+        "required_fields": ["period"],
+        "optional_fields": [
+            "min", "max", "value", "unit", "is_undefined",
+            "multiple_areas", "note"
+        ],
+        "field_definitions": {
+            "min": {
+                "type": "number",
+                "description": "面積の最小値"
+            },
+            "max": {
+                "type": "number",
+                "description": "面積の最大値"
+            },
+            "value": {
+                "type": "number",
+                "description": "単一面積値"
+            },
+            "unit": {
+                "type": "string",
+                "enum": ["m²", "㎡", "坪", "畳"],
+                "description": "面積の単位"
+            },
+            "is_undefined": {
+                "type": "boolean",
+                "description": "面積未定の場合true"
+            },
+            "multiple_areas": {
+                "type": "array",
+                "description": "複数面積の配列（その他面積等）",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "value": {"type": "number"},
+                        "unit": {"type": "string"},
+                        "description": {"type": "string"}
+                    }
+                }
+            },
+            "note": {
+                "type": "string",
+                "description": "面積に関する特記事項"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "面積帯",
+                "value": {"min": 70.5, "max": 85.2, "unit": "m²", "period": 4}
+            },
+            {
+                "description": "単一面積",
+                "value": {"value": 75.8, "unit": "m²", "period": 4}
+            },
+            {
+                "description": "複数面積",
+                "value": {"multiple_areas": [{"value": 12.5, "unit": "m²", "description": "バルコニー"}, {"value": 8.3, "unit": "m²", "description": "テラス"}], "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "area_distribution": {
+                "field": ["min", "max", "value"],
+                "description": "面積分布・平均面積分析"
+            },
+            "unit_conversion": {
+                "field": "unit",
+                "description": "単位換算・標準化"
+            },
+            "additional_space": {
+                "field": "multiple_areas",
+                "description": "付加価値面積の分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "平均面積計算",
+                "sql": "SELECT AVG(CASE WHEN JSON_EXTRACT(value_cleaned, '$.value') IS NOT NULL THEN JSON_EXTRACT(value_cleaned, '$.value') ELSE (JSON_EXTRACT(value_cleaned, '$.min') + JSON_EXTRACT(value_cleaned, '$.max'))/2 END) as avg_area FROM estate_cleaned WHERE id_cleaned = [area_id]"
+            },
+            {
+                "purpose": "面積帯別物件数",
+                "sql": "SELECT CASE WHEN JSON_EXTRACT(value_cleaned, '$.value') < 50 THEN '50m²未満' WHEN JSON_EXTRACT(value_cleaned, '$.value') < 80 THEN '50-80m²' ELSE '80m²以上' END as area_range, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [area_id] GROUP BY area_range"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_layout_type_schema() -> Dict[str, Any]:
+    """
+    間取りデータ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 間取りデータ用のtype情報
+    """
+    return {
+        "base_type": "structured_layout",
+        "data_type": "object",
+        "required_fields": ["raw", "period"],
+        "optional_fields": [
+            "rooms", "layout_type", "variations", "is_multiple",
+            "parsed_layouts", "standardized"
+        ],
+        "field_definitions": {
+            "raw": {
+                "type": "string",
+                "description": "元の間取り文字列"
+            },
+            "rooms": {
+                "type": "string",
+                "description": "主要間取り（例: 3LDK, 2DK）"
+            },
+            "layout_type": {
+                "type": "string",
+                "enum": ["LDK", "DK", "K", "R", "1R", "S", "SLDK"],
+                "description": "間取りタイプ"
+            },
+            "variations": {
+                "type": "array",
+                "description": "間取りバリエーション",
+                "items": {"type": "string"}
+            },
+            "is_multiple": {
+                "type": "boolean",
+                "description": "複数間取りの場合true"
+            },
+            "parsed_layouts": {
+                "type": "array",
+                "description": "解析済み間取り詳細",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "bedrooms": {"type": "integer"},
+                        "living": {"type": "boolean"},
+                        "dining": {"type": "boolean"}, 
+                        "kitchen": {"type": "boolean"},
+                        "service": {"type": "boolean"}
+                    }
+                }
+            },
+            "standardized": {
+                "type": "string",
+                "description": "標準化された間取り表記"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "単一間取り",
+                "value": {"raw": "3LDK", "rooms": "3LDK", "layout_type": "LDK", "period": 4}
+            },
+            {
+                "description": "複数間取り",
+                "value": {"raw": "2LDK・3LDK", "is_multiple": True, "variations": ["2LDK", "3LDK"], "period": 4}
+            },
+            {
+                "description": "解析済み",
+                "value": {"raw": "3LDK", "parsed_layouts": [{"bedrooms": 3, "living": True, "dining": True, "kitchen": True}], "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "room_count_analysis": {
+                "field": ["rooms", "parsed_layouts"],
+                "description": "部屋数・間取りタイプ別分析"
+            },
+            "layout_popularity": {
+                "field": "layout_type",
+                "description": "間取りタイプ別人気度分析"
+            },
+            "variation_analysis": {
+                "field": ["is_multiple", "variations"],
+                "description": "間取りバリエーション分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "間取り別物件数",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.layout_type') as layout, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [layout_id] GROUP BY layout"
+            },
+            {
+                "purpose": "部屋数分布",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.parsed_layouts[0].bedrooms') as bedrooms, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [layout_id] GROUP BY bedrooms"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_date_type_schema() -> Dict[str, Any]:
+    """
+    日付データ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 日付データ用のtype情報
+    """
+    return {
+        "base_type": "date_or_period",
+        "data_type": "date",
+        "required_fields": ["period"],
+        "optional_fields": [
+            "year", "month", "day", "period_text", "estimated_date",
+            "completed", "tentative", "immediate", "is_undefined"
+        ],
+        "field_definitions": {
+            "year": {
+                "type": "integer",
+                "description": "年（西暦）"
+            },
+            "month": {
+                "type": "integer",
+                "description": "月"
+            },
+            "day": {
+                "type": "integer",
+                "description": "日"
+            },
+            "period_text": {
+                "type": "string",
+                "enum": ["上旬", "中旬", "下旬"],
+                "description": "期間テキスト"
+            },
+            "estimated_date": {
+                "type": "string",
+                "description": "推定日付（YYYY-MM-DD形式）"
+            },
+            "completed": {
+                "type": "boolean",
+                "description": "完成済み・竣工済みの場合true"
+            },
+            "tentative": {
+                "type": "boolean",
+                "description": "予定の場合true"
+            },
+            "immediate": {
+                "type": "boolean",
+                "description": "即時の場合true"
+            },
+            "is_undefined": {
+                "type": "boolean",
+                "description": "日付未定の場合true"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "具体的日付",
+                "value": {"year": 2024, "month": 3, "estimated_date": "2024-03-01", "period": 4}
+            },
+            {
+                "description": "期間指定",
+                "value": {"year": 2024, "month": 3, "period_text": "下旬", "estimated_date": "2024-03-25", "period": 4}
+            },
+            {
+                "description": "完成済み",
+                "value": {"completed": True, "period": 4}
+            },
+            {
+                "description": "日付未定",
+                "value": {"is_undefined": True, "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "timeline_analysis": {
+                "field": ["year", "month", "estimated_date"],
+                "description": "時系列・スケジュール分析"
+            },
+            "completion_status": {
+                "field": ["completed", "tentative", "immediate"],
+                "description": "完成状況・スケジュール状態分析"
+            },
+            "seasonal_trends": {
+                "field": ["month", "period_text"],
+                "description": "季節別・月別トレンド分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "年別完成予定",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.year') as year, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [date_id] AND JSON_EXTRACT(value_cleaned, '$.year') IS NOT NULL GROUP BY year"
+            },
+            {
+                "purpose": "完成状況別",
+                "sql": "SELECT CASE WHEN JSON_EXTRACT(value_cleaned, '$.completed') = true THEN '完成済み' WHEN JSON_EXTRACT(value_cleaned, '$.tentative') = true THEN '予定' ELSE 'その他' END as status, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [date_id] GROUP BY status"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_access_type_schema() -> Dict[str, Any]:
+    """
+    交通アクセスデータ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 交通アクセスデータ用のtype情報
+    """
+    return {
+        "base_type": "access_routes",
+        "data_type": "array",
+        "required_fields": ["routes", "period"],
+        "optional_fields": ["note"],
+        "field_definitions": {
+            "routes": {
+                "type": "array",
+                "description": "交通ルート配列",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "line": {"type": "string", "description": "路線名"},
+                        "station": {"type": "string", "description": "駅名"},
+                        "method": {"type": "string", "description": "交通手段"},
+                        "time": {"type": "integer", "description": "所要時間（分）"},
+                        "distance": {"type": "number", "description": "距離（km）"}
+                    }
+                }
+            },
+            "note": {
+                "type": "string",
+                "description": "交通アクセスに関する特記事項"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "複数路線アクセス",
+                "value": {
+                    "routes": [
+                        {"line": "JR山手線", "station": "新宿駅", "method": "徒歩", "time": 5},
+                        {"line": "東京メトロ丸の内線", "station": "新宿三丁目駅", "method": "徒歩", "time": 3}
+                    ],
+                    "period": 4
+                }
+            }
+        ],
+        "analysis_keys": {
+            "accessibility_score": {
+                "field": ["routes"],
+                "description": "アクセス利便性スコア算出"
+            },
+            "transportation_method": {
+                "field": "routes[].method",
+                "description": "交通手段別分析"
+            },
+            "commute_time": {
+                "field": "routes[].time",
+                "description": "通勤時間帯別分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "平均アクセス時間",
+                "sql": "SELECT AVG(JSON_EXTRACT(route.value, '$.time')) as avg_time FROM estate_cleaned, JSON_EACH(JSON_EXTRACT(value_cleaned, '$.routes')) as route WHERE id_cleaned = [access_id]"
+            },
+            {
+                "purpose": "路線別物件数",
+                "sql": "SELECT JSON_EXTRACT(route.value, '$.line') as line, COUNT(DISTINCT id_run) FROM estate_cleaned, JSON_EACH(JSON_EXTRACT(value_cleaned, '$.routes')) as route WHERE id_cleaned = [access_id] GROUP BY line"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_boolean_type_schema() -> Dict[str, Any]:
+    """
+    Boolean（有無）データ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: Booleanデータ用のtype情報  
+    """
+    return {
+        "base_type": "boolean_with_details",
+        "data_type": "boolean",
+        "required_fields": ["value", "period"],
+        "optional_fields": ["details", "note", "availability_type"],
+        "field_definitions": {
+            "value": {
+                "type": "boolean",
+                "description": "有無の真偽値"
+            },
+            "details": {
+                "type": "string",
+                "description": "詳細情報（料金、条件等）"
+            },
+            "note": {
+                "type": "string",
+                "description": "特記事項"
+            },
+            "availability_type": {
+                "type": "string",
+                "enum": ["有", "無", "可", "不可", "要確認", "条件付き"],
+                "description": "可用性タイプ"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "単純な有無",
+                "value": {"value": True, "availability_type": "有", "period": 4}
+            },
+            {
+                "description": "詳細情報付き",
+                "value": {"value": True, "details": "月額1万円", "availability_type": "有", "period": 4}
+            },
+            {
+                "description": "条件付き",
+                "value": {"value": True, "details": "抽選", "availability_type": "条件付き", "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "availability_rate": {
+                "field": "value",
+                "description": "設備・サービス提供率"
+            },
+            "condition_analysis": {
+                "field": ["availability_type", "details"],
+                "description": "提供条件・詳細分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "設備提供率",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.value') as available, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [boolean_id] GROUP BY available"
+            },
+            {
+                "purpose": "提供条件別",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.availability_type') as type, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [boolean_id] GROUP BY type"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_number_type_schema() -> Dict[str, Any]:
+    """
+    数値データ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 数値データ用のtype情報
+    """
+    return {
+        "base_type": "number_with_unit",
+        "data_type": "number",
+        "required_fields": ["period"],
+        "optional_fields": ["value", "unit", "is_undefined", "note"],
+        "field_definitions": {
+            "value": {
+                "type": "number",
+                "description": "数値"
+            },
+            "unit": {
+                "type": "string",
+                "description": "単位（階、戸、台等）"
+            },
+            "is_undefined": {
+                "type": "boolean",
+                "description": "未定の場合true"
+            },
+            "note": {
+                "type": "string",
+                "description": "補足情報"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "階数",
+                "value": {"value": 15, "unit": "階", "period": 4}
+            },
+            {
+                "description": "戸数",
+                "value": {"value": 180, "unit": "戸", "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "value_distribution": {
+                "field": "value",
+                "description": "数値分布分析"
+            },
+            "unit_categorization": {
+                "field": "unit",
+                "description": "単位別カテゴリ分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "平均値計算",
+                "sql": "SELECT AVG(JSON_EXTRACT(value_cleaned, '$.value')) as avg_value FROM estate_cleaned WHERE id_cleaned = [number_id] AND JSON_EXTRACT(value_cleaned, '$.value') IS NOT NULL"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_text_type_schema() -> Dict[str, Any]:
+    """
+    テキストデータ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: テキストデータ用のtype情報
+    """
+    return {
+        "base_type": "structured_text",
+        "data_type": "text",
+        "required_fields": ["value", "period"],
+        "optional_fields": ["category", "keywords", "is_null"],
+        "field_definitions": {
+            "value": {
+                "type": "string",
+                "description": "テキスト内容"
+            },
+            "category": {
+                "type": "string",
+                "description": "テキストカテゴリ"
+            },
+            "keywords": {
+                "type": "array",
+                "description": "抽出キーワード",
+                "items": {"type": "string"}
+            },
+            "is_null": {
+                "type": "boolean",
+                "description": "分析対象外の場合true"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "通常テキスト",
+                "value": {"value": "南向きバルコニー", "keywords": ["南向き", "バルコニー"], "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "keyword_frequency": {
+                "field": "keywords",
+                "description": "キーワード頻度分析"
+            },
+            "category_distribution": {
+                "field": "category",
+                "description": "カテゴリ別分布"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "キーワード検索",
+                "sql": "SELECT * FROM estate_cleaned WHERE id_cleaned = [text_id] AND JSON_EXTRACT(value_cleaned, '$.value') LIKE '%keyword%'"
+            }
+        ],
+        "period_aware": True
     }
