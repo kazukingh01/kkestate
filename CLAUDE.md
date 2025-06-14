@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 IMPORTANT: 基本的に日本語での応答をお願いする. 「。」は嫌いなので、「. 」ピリオド＆半角スペース(文末ではなく、文中の場合)を代用する.
-NEVER: 「->」は使用禁止.「->」で代用する.
+NEVER: 「→」は使用禁止.「->」で代用する.
 
 ## Project Overview
 
@@ -55,6 +55,9 @@ VPSのホスト側でCron起動されたPythonが常時実行され、Docker con
 **並列処理関連**
 - `joblib==1.4.2`: 並列計算・キャッシュ
 
+**logger 管理**
+- `kklogger`: ログ出力用のカスタムライブラリ（実装確認済み）
+
 ### Key Features
 
 時系列的に定点観測された日本全国の不動産データを用いた分析が可能である.
@@ -70,21 +73,25 @@ VPSのホスト側でCron起動されたPythonが常時実行され、Docker con
 ```
 ├── .claude
 ├── CLAUDE.md
-├── README.md      # プロジェクト概要や、サービス構築手順など.
-├── kkestate       # 共通して使われる class や function はここで管理される
-│   ├── config     # データベース接続などの設定用ファイル
-│   └── util       # 共通した処理が関数化されて管理される
-├── main           # サービスインストールや実行に必要なファイル群
-│   ├── analyze    # データ分析
-│   ├── collect    # データ収集
-│   ├── database   # データベースに関連するファイル. schema など
-│   ├── log        # サービス実行時のログが格納される. 基本的に空
-│   ├── others     # その他ファイル. crontab など
-│   ├── process    # 収集されたデータの後処理. データクレンジングや項目整理など
-│   └── web        # データ分析及び結果を確認するためのWeb画面
-├── pyproject.toml # Python の依存パッケージの記述
-├── tests          # テスト用プログラム
-└── venv           # pyproject.toml を元に作成された仮想環境. `pyhton -m venv venv & source .venv/bin/activate & pip install -e .` で実行された後の状態
+├── README.md          # プロジェクト概要や、サービス構築手順など.
+├── kkestate           # 共通して使われる class や function はここで管理される
+│   ├── config         # データベース接続などの設定用ファイル
+│   └── util           # 共通した処理が関数化されて管理される
+├── main               # サービスインストールや実行に必要なファイル群
+│   ├── analyze        # データ分析
+│   ├── collect        # データ収集
+│   │   ├── monitor.sh # 実行バッチ（完成済）
+│   │   └── suumo.py   # 情報収集モジュール（完成済）
+│   ├── database       # データベースに関連するファイル. schema など
+│   │   ├── schema.collect.sql
+│   │   └── schema.process.sql
+│   ├── log            # サービス実行時のログが格納される. 基本的に空
+│   ├── others         # その他ファイル. crontab など
+│   ├── process        # 収集されたデータの後処理. データクレンジングや項目整理など
+│   └── web            # データ分析及び結果を確認するためのWeb画面
+├── pyproject.toml     # Python の依存パッケージの記述
+├── test               # テスト用プログラム
+└── venv               # pyproject.toml を元に作成された仮想環境. `pyhton -m venv venv & source .venv/bin/activate & pip install -e .` で実行された後の状態
 ```
 
 NEVER: 上述のディレクトリ構造は保ち、新規ディレクトリの作成は禁ずる.
@@ -171,23 +178,22 @@ IMPORTANT: モジュール内でしか使われない関数やクラスは、そ
 
 #### Main
 
-NEVER: main() プロセスは書かない.
-IMPORTANT: 以下のように `if __name__ == "__main__":` からはじめ、argparse で引数を設定できるようにする. その際、database の update の処理が入る場合は、`update` flg を持たせる事.
+- NEVER: main() プロセスは書かない.
+- IMPORTANT: 以下のように `if __name__ == "__main__":` からはじめ、argparse で引数を設定できるようにする. 
+- その際、database の INSERT / UPDATE / COPY の処理が入る場合は、`update` flg を持たせる事. また、それらの処理は if args.update: で必ずロジックを分ける事.
 
 ```python
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--updateurls",  action='store_true', default=False)
-    parser.add_argument("--update",      action='store_true', default=False)
-    parser.add_argument("--runmain",     action='store_true', default=False)
-    parser.add_argument("--rundetail",   action='store_true', default=False)
-    parser.add_argument("--skipsuccess", action='store_true', default=False)
-    parser.add_argument("--datefrom",    type=str, help="--datefrom 20230101", required=False)
+    parser.add_argument("--update",  action='store_true', default=False)
+    ...
+    args = parser.parse_args()
+    LOGGER.info(f"{args}")
 ```
 
 #### Logger
 
-NEVER: log は基本実行シェルを nohup で起動して log にするので、python内部で log を生成する処理は書かない.
+NEVER: pythonモジュール内の実行処理として、log ファイルを外部に生成し、そこに print や logger の情報を出力する、といった処理は禁ずる.
 IMPORTANT: logger は下記の方法で `main/` と `test` 内の各モジュールで実装される事. 
 
 ```python
@@ -196,6 +202,11 @@ from kklogger import set_logger
 LOGGER = set_logger(__name__)
 # How to use
 LOGGER.info(f"test code.")
+# Change the color
+LOGGER.info("Hello, World!", color=["BOLD",      "GREEN"])
+LOGGER.info("Hello, World!", color=["UNDERLINE", "BLUE"])
+LOGGER.info("Hello, World!", color=["REVERCE",   "RED"])
+LOGGER.info("Hello, World!", color=["INVISIBLE", "WHITE"])
 ```
 
 #### Database
@@ -297,26 +308,27 @@ flowchart RL
    - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
 
 2. **`estate_main`** - 物件の基本情報テーブル
-   - `id` (bigint, NOT NULL, PK): 自動採番ID
+   - `id` (bigint, NOT NULL, PK, auto-increment): 自動採番ID
    - `name` (text): 物件名
    - `url` (text, NOT NULL, UNIQUE): 物件詳細ページのURL（一意）
    - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
 
 3. **`estate_run`** - 実行履歴管理テーブル
-   - `id` (bigint, NOT NULL, PK): 自動採番ID
+   - `id` (bigint, NOT NULL, PK, auto-increment): 自動採番ID
    - `id_main` (bigint, NOT NULL): estate_mainのIDへの参照
    - `is_success` (boolean, NOT NULL, default: false): 実行成功フラグ
    - `timestamp` (timestamp): 実行日時
 
 4. **`estate_mst_key`** - 項目名マスタテーブル
-   - `id` (smallint, NOT NULL, PK): 自動採番ID
+   - `id` (smallint, NOT NULL, PK, auto-increment): 自動採番ID
    - `name` (text, NOT NULL, UNIQUE): 項目名（スクレイピングで取得されるキー）
    - `sys_updated` (timestamp, NOT NULL, default: CURRENT_TIMESTAMP): 更新日時
    - `id_cleaned` (smallint): estate_mst_cleanedのIDへの参照
 
 5. **`estate_mst_cleaned`** - クレンジング済み項目名マスタテーブル
-   - `id` (smallint, NOT NULL, PK): 自動採番ID
-   - `name` (text, NOT NULL): クレンジング済み項目名
+   - `id` (smallint, NOT NULL, PK, auto-increment): 自動採番ID
+   - `name` (text, NOT NULL, UNIQUE): クレンジング済み項目名
+   - `type` (json): 値の型定義とスキーマ情報
 
 6. **`estate_detail`** - 物件詳細情報テーブル
    - `id_run` (bigint, NOT NULL): estate_runのIDへの参照
@@ -328,8 +340,61 @@ flowchart RL
    - `id_run` (bigint, NOT NULL): estate_runのIDへの参照
    - `id_key` (smallint, NOT NULL): estate_mst_keyのIDへの参照
    - `id_cleaned` (smallint, NOT NULL): estate_mst_cleanedのIDへの参照
-   - `value_cleaned` (text): クレンジング済みの値
+   - `value_cleaned` (json): クレンジング済みの値（JSON形式）
    - 複合主キー: (id_run, id_key)
+
+#### JSON データ構造例
+
+**estate_mst_cleaned.type**:
+```json
+{
+  "base_type": "range|single|boolean|period",
+  "data_type": "number|text|date",
+  "fields": ["min", "max", "unit"] or ["value"] or ["period", "value"],
+  "period_aware": true|false
+}
+```
+
+**estate_cleaned.value_cleaned**:
+```json
+// 範囲データ（価格、面積など）
+{"min": 2685, "max": 3955, "unit": "万円", "period": 4}
+
+// 単一値データ
+{"value": "2LDK・3LDK", "period": 4}
+
+// Boolean データ
+{"value": true, "period": 4}
+```
+
+#### インデックス構成
+
+**estate_main**:
+- PK: `id`
+- UNIQUE: `url`
+
+**estate_run**:
+- PK: `id`
+
+**estate_mst_key**:
+- PK: `id`
+- UNIQUE: `name`
+
+**estate_mst_cleaned**:
+- PK: `id`
+- UNIQUE: `name`
+
+**estate_detail**:
+- PK: `(id_run, id_key)`
+- INDEX: `id_run`
+- INDEX: `id_key`
+
+**estate_cleaned**:
+- PK: `(id_run, id_key)`
+- INDEX: `id_run`
+- INDEX: `id_key`
+- INDEX: `id_cleaned`
+- INDEX: `(id_run, id_cleaned)`
 
 ### External Services
 
