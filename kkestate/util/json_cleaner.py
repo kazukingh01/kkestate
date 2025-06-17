@@ -5,9 +5,12 @@ estate_detailの生データをJSONオブジェクトに変換
 
 import re
 import json
+import math
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from .address_parser import parse_address_structure
+from .surrounding_facilities_parser import clean_surrounding_facilities_to_json
+from .land_use_parser import parse_land_use_to_json
 
 def _should_nullify_text(value: str) -> bool:
     """
@@ -75,7 +78,7 @@ def clean_price_to_json(value: str, period: Optional[int] = None) -> Dict[str, A
     価格情報をJSON形式でクレンジング
     例: "2685万円～3955万円" -> {"min": 2685, "max": 3955, "unit": "万円", "period": 4}
     """
-    if not value or value.strip() == "" or _should_nullify_text(value.strip()):
+    if not value or value.strip() == "":
         result = {"value": None}
         if period is not None:
             result["period"] = period
@@ -84,27 +87,45 @@ def clean_price_to_json(value: str, period: Optional[int] = None) -> Dict[str, A
     value = value.strip()
     result = {}
     
-    # 価格未定などのケース（nullとして処理）
-    if "未定" in value or "要相談" in value:
+    # 価格未定などのケース  
+    if "未定" in value:
+        result["is_undefined"] = True
         result["value"] = None
         if period is not None:
             result["period"] = period
         return result
     
+    # その他の無効な値のチェック
+    if _should_nullify_text(value):
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 価格要相談のケース
+    if "要相談" in value or "価格要相談" in value:
+        result["type"] = "negotiable"
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 括弧内の価格は注記として扱い、主価格は括弧外から抽出
+    main_text = re.sub(r'[（(][^）)]*[）)]', '', value)  # 括弧を除去
+    
     # 億円を含む価格の処理
-    if "億" in value:
+    if "億" in main_text:
         # 億円の数値をすべて万円に変換
         prices_in_man = []
         
         # 億と万を含む価格を処理（例：1億2300万円）
-        for match in re.finditer(r'(\d+(?:\.\d+)?)億(?:(\d+(?:\.\d+)?)万)?', value):
+        for match in re.finditer(r'(\d+(?:\.\d+)?)億(?:(\d+(?:\.\d+)?)万)?', main_text):
             oku = float(match.group(1))
             man = float(match.group(2)) if match.group(2) else 0
             total_man = oku * 10000 + man  # 億を万に変換して合計
             prices_in_man.append(total_man)
         
         # 万円のみの価格も抽出（億と組み合わさっていないもの）
-        for match in re.finditer(r'(?<![億\d])(\d+(?:,\d{3})*(?:\.\d+)?)万', value):
+        for match in re.finditer(r'(?<![億\d])(\d+(?:,\d{3})*(?:\.\d+)?)万', main_text):
             man = float(match.group(1).replace(',', ''))
             prices_in_man.append(man)
         
@@ -118,13 +139,13 @@ def clean_price_to_json(value: str, period: Optional[int] = None) -> Dict[str, A
                 # 平均値も追加
                 result["value"] = (result["min"] + result["max"]) / 2
     else:
-        # 万円を含む複雑な価格パターンの処理
+        # 万円を含む複雑な価格パターンの処理（括弧外のテキストから）
         prices_in_unit = []
         
         # 万円パターンの処理（例：3989万5000円）
-        if "万" in value:
+        if "万" in main_text:
             # パターン1: 「3989万5000円」のような形式
-            man_yen_pattern = re.findall(r'(\d+(?:,\d{3})*)万(\d+(?:,\d{3})*)円', value)
+            man_yen_pattern = re.findall(r'(\d+(?:,\d{3})*)万(\d+(?:,\d{3})*)円', main_text)
             for man_part, yen_part in man_yen_pattern:
                 man_val = float(man_part.replace(',', ''))
                 yen_val = float(yen_part.replace(',', ''))
@@ -133,7 +154,7 @@ def clean_price_to_json(value: str, period: Optional[int] = None) -> Dict[str, A
                 prices_in_unit.append(total_man)
             
             # パターン2: 「万円」のみ（例：3989万円）
-            man_only_pattern = re.findall(r'(\d+(?:,\d{3})*)万円', value)
+            man_only_pattern = re.findall(r'(\d+(?:,\d{3})*)万円', main_text)
             for man_str in man_only_pattern:
                 # 既にパターン1で処理されていないかチェック
                 already_processed = False
@@ -167,8 +188,8 @@ def clean_price_to_json(value: str, period: Optional[int] = None) -> Dict[str, A
                 clean_num = float(num.replace(',', ''))
                 prices_in_unit.append(clean_num)
         
-        # 範囲表現（〜）がある場合
-        if "～" in value or "〜" in value:
+        # 範囲表現（〜）がある場合（括弧外のテキストをチェック）
+        if "～" in main_text or "〜" in main_text:
             if len(prices_in_unit) >= 2:
                 result["min"] = min(prices_in_unit)
                 result["max"] = max(prices_in_unit)
@@ -187,6 +208,18 @@ def clean_price_to_json(value: str, period: Optional[int] = None) -> Dict[str, A
                 # 平均値も追加
                 result["value"] = (result["min"] + result["max"]) / 2
     
+    # 括弧内の注記を抽出
+    note_match = re.search(r'[（(]([^）)]*)[）)]', value)
+    if note_match:
+        note_text = note_match.group(1).strip()
+        # 支払いシミュレーションなどの不要な情報は除外
+        if not any(exclude in note_text for exclude in ["支払シミュレーション", "□"]):
+            result["note"] = note_text
+    
+    # 参考価格の場合
+    if "参考価格" in value:
+        result["tentative"] = True
+    
     if period is not None:
         result["period"] = period
     
@@ -196,6 +229,7 @@ def clean_price_band_to_json(value: str, raw_key: str, period: Optional[int] = N
     """
     最多価格帯情報をJSON形式でクレンジング
     例: "3500万円台（7戸）" -> {"values": [{"price": 3500, "count": 7}], "value": 3500, "unit": "万円"}
+    例: "1200万円台（4区画）" -> {"values": [{"price": 1200, "count": 4}], "value": 1200, "unit": "万円"}
     例: "3700万円台・3800万円台（各2戸）" -> {"values": [{"price": 3700, "count": 2}, {"price": 3800, "count": 2}], "value": 3750, "unit": "万円"}
     """
     if not value or value.strip() == "" or _should_nullify_text(value.strip()):
@@ -217,16 +251,66 @@ def clean_price_band_to_json(value: str, raw_key: str, period: Optional[int] = N
     
     # 価格帯と戸数のパターンを厳密にチェック
     
-    # パターン1: "5500万円台（2戸）" - 単一価格帯で括弧内に戸数
-    single_pattern_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台（(\d+)戸）$', value.strip())
+    # パターン1: "5500万円台（2戸）"、"1200万円台（4区画）"、"5000万円台（9戸）※1000万円単位" - 単一価格帯で括弧内に戸数/区画数
+    single_pattern_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台(?:（予定）)?（(\d+)(?:戸|区画)）(?:※.*)?$', value.strip())
     
-    # パターン2: "5700万円台・5900万円台（各1戸）" - 複数価格帯で「各X戸」
-    multi_pattern_match = re.match(r'^(.+?)（各(\d+)戸）$', value.strip())
+    # 億円台パターン: "1億円台（4戸）" -> 1億円を10000万円に変換
+    oku_pattern_match = re.match(r'^(\d+(?:\.\d+)?)億円台（(\d+)(?:戸|区画)）$', value.strip())
     
-    if single_pattern_match:
-        # パターン1: 単一価格帯
+    # パターン1-2: "8000万円台 2区画 ※1000万円単位" - 括弧なしで戸数/区画数（※注記は無視）
+    single_no_paren_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台\s+(\d+)(?:戸|区画)(?:\s+※.*)?$', value.strip())
+    
+    # パターン2: "5700万円台・5900万円台（各1戸）" または "5700万円台・5900万円台（各1区画）" - 複数価格帯で「各X戸/区画」
+    multi_pattern_match = re.match(r'^(.+?)（各(\d+)(?:戸|区画)）$', value.strip())
+    
+    # パターン3: 範囲指定価格帯（括弧内注記は無視）
+    # 「8900万円台～1億2900万円台」のような億万円混合範囲パターン
+    oku_man_range_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台～(\d+(?:\.\d+)?)億(\d+(?:,\d{3})*)万円台$', value.strip())
+    
+    # 「2700万円台～4400万円台（うちモデルルーム価格4476万円、予定）」のような万円のみ範囲パターン
+    range_pattern_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台～(\d+(?:,\d{3})*(?:\.\d+)?)万円台(?:[（(].*?[）)])?(?:※.*)?$', value.strip())
+    
+    if oku_man_range_match:
+        # 億万円混合範囲パターン: 8900万円台～1億2900万円台
+        min_man_str = oku_man_range_match.group(1)
+        max_oku_str = oku_man_range_match.group(2)
+        max_man_str = oku_man_range_match.group(3)
+        
+        min_price = float(min_man_str.replace(',', ''))  # 8900万円
+        max_oku = float(max_oku_str)  # 1億
+        max_man = float(max_man_str.replace(',', ''))  # 2900万円
+        max_price = max_oku * 10000 + max_man  # 10000 + 2900 = 12900万円
+        
+        avg_price = (min_price + max_price) / 2
+        result["values"].append({"price": min_price, "count": None})
+        result["values"].append({"price": max_price, "count": None})
+        result["value"] = avg_price
+        
+        if period is not None:
+            result["period"] = period
+        return result
+        
+    elif oku_pattern_match:
+        # 億円台パターン
+        oku_str = oku_pattern_match.group(1)
+        count_str = oku_pattern_match.group(2)
+        oku = float(oku_str)
+        count = int(count_str)
+        price_in_man = oku * 10000  # 億を万に変換
+        result["values"].append({"price": price_in_man, "count": count})
+        
+    elif single_pattern_match:
+        # パターン1: 単一価格帯（括弧あり）
         price_str = single_pattern_match.group(1)
         count_str = single_pattern_match.group(2)
+        price = float(price_str.replace(',', ''))
+        count = int(count_str)
+        result["values"].append({"price": price, "count": count})
+        
+    elif single_no_paren_match:
+        # パターン1-2: 単一価格帯（括弧なし）
+        price_str = single_no_paren_match.group(1)
+        count_str = single_no_paren_match.group(2)
         price = float(price_str.replace(',', ''))
         count = int(count_str)
         result["values"].append({"price": price, "count": count})
@@ -261,19 +345,66 @@ def clean_price_band_to_json(value: str, raw_key: str, period: Optional[int] = N
             if period is not None:
                 result["period"] = period
             return result
-    else:
-        # パターン3: 単一価格帯（戸数情報なし）例：「3900万円台」
-        single_band_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台$', value.strip())
-        if single_band_match:
-            price_str = single_band_match.group(1)
-            price = float(price_str.replace(',', ''))
-            result["values"].append({"price": price, "count": 1})
+    elif '・' in value.strip():
+        # パターン3-2: 複数価格帯（戸数情報なし）例: "4600万円台・4900万円台"
+        price_items = value.strip().split('・')
+        valid_prices = []
+        for item in price_items:
+            price_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台$', item.strip())
+            if price_match:
+                price = float(price_match.group(1).replace(',', ''))
+                valid_prices.append(price)
+        
+        if len(valid_prices) == len(price_items):  # 全ての価格が正しく抽出できた場合のみ
+            for price in valid_prices:
+                result["values"].append({"price": price, "count": None})
         else:
-            # 既知のパターンに当てはまらない場合は対応不可
+            # 一部でも抽出できない場合は対応不可
             result["value"] = -1
             if period is not None:
                 result["period"] = period
             return result
+    elif range_pattern_match:
+        # パターン4: 範囲指定価格帯
+        min_price_str = range_pattern_match.group(1)
+        max_price_str = range_pattern_match.group(2)
+        min_price = float(min_price_str.replace(',', ''))
+        max_price = float(max_price_str.replace(',', ''))
+        
+        # 範囲の平均値を計算
+        avg_price = (min_price + max_price) / 2
+        result["values"].append({"price": min_price, "count": None})
+        result["values"].append({"price": max_price, "count": None})
+        result["value"] = avg_price
+        
+        if period is not None:
+            result["period"] = period
+        return result
+    else:
+        # パターン5: 単一価格帯（戸数情報なし）
+        
+        # 億万円台パターン（例：「1億1000万円台※1000万円単位」）
+        oku_man_band_match = re.match(r'^(\d+(?:\.\d+)?)億(\d+(?:,\d{3})*)万円台(?:※.*)?$', value.strip())
+        if oku_man_band_match:
+            oku_str = oku_man_band_match.group(1)
+            man_str = oku_man_band_match.group(2)
+            oku = float(oku_str)
+            man = float(man_str.replace(',', ''))
+            price_in_man = oku * 10000 + man  # 億を万に変換して合計
+            result["values"].append({"price": price_in_man, "count": 1})
+        else:
+            # 万円台パターン（例：「3900万円台」）
+            single_band_match = re.match(r'^(\d+(?:,\d{3})*(?:\.\d+)?)万円台(?:※.*)?$', value.strip())
+            if single_band_match:
+                price_str = single_band_match.group(1)
+                price = float(price_str.replace(',', ''))
+                result["values"].append({"price": price, "count": 1})
+            else:
+                # 既知のパターンに当てはまらない場合は対応不可
+                result["value"] = -1
+                if period is not None:
+                    result["period"] = period
+                return result
     
     # 平均価格を計算
     if result["values"]:
@@ -353,12 +484,12 @@ def clean_area_to_json(value: str, period: Optional[int] = None) -> Dict[str, An
         if len(area_numbers) >= 2:
             result["min"] = min(area_numbers)
             result["max"] = max(area_numbers)
-            result["value"] = (result["min"] + result["max"]) / 2
+            result["value"] = round((result["min"] + result["max"]) / 2, 3)
         else:
             # フォールバック：すべての数値から最初の2つを使用
             result["min"] = clean_numbers[0]
             result["max"] = clean_numbers[1] if len(clean_numbers) > 1 else clean_numbers[0]
-            result["value"] = (result["min"] + result["max"]) / 2
+            result["value"] = round((result["min"] + result["max"]) / 2, 3)
     else:
         # 単一値または複数値があっても範囲でない場合
         # 最初の数値を面積として扱い、2番目があれば坪数として扱う
@@ -409,8 +540,8 @@ def clean_multiple_area_to_json(value: str, period: Optional[int] = None) -> Dic
     value = value.strip()
     result = {"areas": []}
     
-    # 「、」で分割して各面積項目を処理
-    parts = re.split(r'[,、，]', value)
+    # 「、」や全角スペースで分割して各面積項目を処理
+    parts = re.split(r'[,、，　\s]+', value)
     
     for part in parts:
         part = part.strip()
@@ -450,17 +581,29 @@ def clean_multiple_area_to_json(value: str, period: Optional[int] = None) -> Dic
             area_info["tsubo"] = round(area_info["value"] / 3.30579, 2)
         
         # 使用料を抽出
-        usage_fee_match = re.search(r'使用料(\d+)円', area_value)
-        if usage_fee_match:
-            area_info["usage_fee"] = int(usage_fee_match.group(1))
-        elif "使用料無" in area_value:
-            area_info["usage_fee"] = 0
+        # パターン1: 使用料1500円
+        usage_fee_match = re.search(r'使用料[：:]?(\d+)円', area_value)
+        # パターン2: （2000円／月）
+        monthly_fee_match = re.search(r'[（(](\d+)円[／/]月[）)]', area_value)
+        # パターン3: （利用料：月額1500円）または（使用料：月額3000円）
+        monthly_fee_match2 = re.search(r'[（(][利使]用料[：:]?月額(\d+)円[）)]', area_value)
         
-        # 測定タイプ（壁芯・登記）を抽出
+        if usage_fee_match:
+            area_info["monthly_fee"] = int(usage_fee_match.group(1))
+        elif monthly_fee_match:
+            area_info["monthly_fee"] = int(monthly_fee_match.group(1))
+        elif monthly_fee_match2:
+            area_info["monthly_fee"] = int(monthly_fee_match2.group(1))
+        elif "使用料無" in area_value:
+            area_info["monthly_fee"] = 0
+        
+        # 測定タイプ（壁芯・登記・共用）を抽出
         if "壁芯" in area_value:
             area_info["measurement_type"] = "壁芯"
         elif "登記" in area_value:
             area_info["measurement_type"] = "登記"
+        elif "共用" in area_value:
+            area_info["measurement_type"] = "共用"
         
         result["areas"].append(area_info)
     
@@ -483,8 +626,20 @@ def clean_layout_to_json(value: str, period: Optional[int] = None) -> Dict[str, 
     
     value = value.strip()
     
-    # （納戸）などの説明文を除去
-    value = re.sub(r'[（(][^）)]*納戸[^）)]*[）)]', '', value)
+    # 間取りの正規化処理
+    normalized_oneroom = False
+    if value == "ワンルーム":
+        value = "1R"
+        normalized_oneroom = True
+    
+    # 間取りパターンを保持しながら括弧内の説明を簡略化
+    # +S（納戸） → +S のように、間取り情報は保持する
+    
+    # 正規化前の値を保存（括弧内の間取り抽出用）
+    original_value = value
+    
+    # 括弧内の説明を除去（+S（納戸）→+S）
+    value = re.sub(r'([+＋][A-Z]+)[（(][^）)]*[）)]', r'\1', value)
     
     result = {}
     
@@ -500,11 +655,11 @@ def clean_layout_to_json(value: str, period: Optional[int] = None) -> Dict[str, 
             # 各部分から間取りを抽出
             for part in range_parts:
                 part = part.strip()
-                layout_match = re.search(r'(\d+(?:[LDKSR]+)(?:[+＋]\d*[LDKSR]*)*)', part.upper())
+                layout_match = re.search(r'(\d+(?:[LDKSRF]+)(?:[+＋]\d*[LDKSRF]*)*)', part.upper())
                 if layout_match:
                     matched_layout = layout_match.group(1)
-                    # 間取りパターンとして有効な場合のみ追加
-                    if len(matched_layout) <= 10 and re.match(r'^\d+[LDKSR]+(?:[+＋]\d*[LDKSR]*)*$', matched_layout):
+                    # 間取りパターンとして有効な場合のみ追加（+で終わるパターンを除外）
+                    if len(matched_layout) <= 10 and re.match(r'^\d+[LDKSRF]+(?:[+＋]\d*[LDKSRF]+)*$', matched_layout) and not matched_layout.endswith(('+', '＋')):
                         layout_items.append(matched_layout)
             
             # 簡単な展開が可能な場合のみ展開（例：1LDK～3LDK）
@@ -513,8 +668,8 @@ def clean_layout_to_json(value: str, period: Optional[int] = None) -> Dict[str, 
                 second_layout = layout_items[1]
                 
                 # 単純なパターン（数字+同じ文字列）の場合のみ展開
-                first_match = re.match(r'^(\d+)([LDKSR]+)$', first_layout)
-                second_match = re.match(r'^(\d+)([LDKSR]+)$', second_layout)
+                first_match = re.match(r'^(\d+)([LDKSRF]+)$', first_layout)
+                second_match = re.match(r'^(\d+)([LDKSRF]+)$', second_layout)
                 
                 if first_match and second_match:
                     start_num = int(first_match.group(1))
@@ -527,12 +682,35 @@ def clean_layout_to_json(value: str, period: Optional[int] = None) -> Dict[str, 
                         layout_items = []
                         for i in range(start_num, end_num + 1):
                             layout_items.append(f"{i}{start_type}")
+                    # 特殊パターン: 1R～XLDKの場合も展開
+                    elif first_layout == "1R" and end_type == "LDK" and start_num == 1 and end_num >= 1:
+                        layout_items = []
+                        layout_items.append("1R")
+                        for i in range(1, end_num + 1):
+                            layout_items.append(f"{i}LDK")
         else:
             # 複雑な範囲パターンは通常の処理に任せる
-            all_layouts = re.findall(r'(\d+(?:[LDKSR]+)(?:[+＋]\d*[LDKSR]*)*)', value.upper())
+            all_layouts = re.findall(r'(\d+(?:[LDKSRF]+)(?:[+＋]\d*[LDKSRF]*)*)', value.upper())
             for layout in all_layouts:
-                if len(layout) <= 10 and re.match(r'^\d+[LDKSR]+(?:[+＋]\d*[LDKSR]*)*$', layout):
+                if len(layout) <= 10 and re.match(r'^\d+[LDKSRF]+(?:[+＋]\d*[LDKSRF]+)*$', layout) and not layout.endswith(('+', '＋')):
                     layout_items.append(layout)
+        
+        # 範囲処理後に括弧内の詳細情報からも間取りを抽出
+        bracket_content = re.findall(r'[（(]([^）)]*)[）)]', value)
+        for bracket in bracket_content:
+            # 括弧内を・で分割してさらに間取りを抽出
+            bracket_parts = re.split(r'[・]', bracket)
+            for bracket_part in bracket_parts:
+                bracket_part = bracket_part.strip()
+                # サービスルーム等の説明文を除去
+                bracket_part = re.sub(r'[（(][^）)]*(?:サービスルーム|ファミリークロゼット|シューズインクローク|納戸)[^）)]*[）)]', '', bracket_part)
+                bracket_layout_match = re.search(r'(\d+(?:[LDKSRF]+)(?:[+＋]\d*[LDKSRF]*)*)', bracket_part.upper())
+                if bracket_layout_match:
+                    bracket_matched_layout = bracket_layout_match.group(1)
+                    if len(bracket_matched_layout) <= 10 and re.match(r'^\d+[LDKSRF]+(?:[+＋]\d*[LDKSRF]+)*$', bracket_matched_layout) and not bracket_matched_layout.endswith(('+', '＋')):
+                        # 重複チェック
+                        if bracket_matched_layout not in layout_items:
+                            layout_items.append(bracket_matched_layout)
     else:
         # ・（中点）で分割
         parts = re.split(r'[・]', value)
@@ -540,20 +718,78 @@ def clean_layout_to_json(value: str, period: Optional[int] = None) -> Dict[str, 
         for part in parts:
             part = part.strip()
             if part:
-                # 各部分から間取りパターンを抽出
-                # より厳密な間取りパターン: 数字 + L/D/K/S/R の組み合わせ
-                layout_match = re.search(r'(\d+(?:[LDKSR]+)(?:[+＋]\d*[LDKSR]*)*)', part.upper())
-                if layout_match:
-                    # マッチした部分が間取りとして妥当かチェック
-                    matched_layout = layout_match.group(1)
-                    # 間取りパターンとして有効な場合のみ追加（LDKSRのみを含み、長すぎない）
-                    if len(matched_layout) <= 10 and re.match(r'^\d+[LDKSR]+(?:[+＋]\d*[LDKSR]*)*$', matched_layout):
-                        layout_items.append(matched_layout)
+                # 括弧がある場合は括弧内の詳細情報も処理
+                if '(' in part or '（' in part:
+                    # 括弧外の間取りを抽出
+                    main_part = re.sub(r'[（(][^）)]*[）)]', '', part)
+                    # 余分な括弧を除去
+                    main_part = re.sub(r'[）)]', '', main_part)
+                    layout_match = re.search(r'(\d+(?:[LDKSR]+)(?:[+＋]\d*[LDKSRF]*)*)', main_part.upper())
+                    if layout_match:
+                        matched_layout = layout_match.group(1)
+                        # +で終わるパターンや不完全なパターンを除外
+                        if len(matched_layout) <= 10 and re.match(r'^\d+[LDKSR]+(?:[+＋]\d*[LDKSRF]+)*$', matched_layout) and not matched_layout.endswith(('+', '＋')):
+                            layout_items.append(matched_layout)
+                    
+                    # 括弧内の間取りも抽出（・で分割されている可能性）
+                    bracket_content = re.findall(r'[（(]([^）)]*)[）)]', part)
+                    for bracket in bracket_content:
+                        # 括弧内を・で分割してさらに間取りを抽出
+                        bracket_parts = re.split(r'[・]', bracket)
+                        for bracket_part in bracket_parts:
+                            bracket_part = bracket_part.strip()
+                            # サービスルーム等の説明文を除去
+                            bracket_part = re.sub(r'[（(][^）)]*(?:サービスルーム|ファミリークロゼット|シューズインクローク|納戸)[^）)]*[）)]', '', bracket_part)
+                            bracket_layout_match = re.search(r'(\d+(?:[LDKSRF]+)(?:[+＋]\d*[LDKSRF]*)*)', bracket_part.upper())
+                            if bracket_layout_match:
+                                bracket_matched_layout = bracket_layout_match.group(1)
+                                if len(bracket_matched_layout) <= 10 and re.match(r'^\d+[LDKSRF]+(?:[+＋]\d*[LDKSRF]+)*$', bracket_matched_layout) and not bracket_matched_layout.endswith(('+', '＋')):
+                                    layout_items.append(bracket_matched_layout)
+                else:
+                    # 各部分から間取りパターンを抽出
+                    # より厳密な間取りパターン: 数字 + L/D/K/S/R/F の組み合わせ
+                    layout_match = re.search(r'(\d+(?:[LDKSRF]+)(?:[+＋]\d*[LDKSRF]*)*)', part.upper())
+                    if layout_match:
+                        # マッチした部分が間取りとして妥当かチェック
+                        matched_layout = layout_match.group(1)
+                        # 間取りパターンとして有効な場合のみ追加（LDKSRFのみを含み、長すぎない、+で終わらない）
+                        if len(matched_layout) <= 10 and re.match(r'^\d+[LDKSRF]+(?:[+＋]\d*[LDKSRF]+)*$', matched_layout) and not matched_layout.endswith(('+', '＋')):
+                            layout_items.append(matched_layout)
     
-    if layout_items:
+    # ワンルームの正規化の場合は特別処理
+    if normalized_oneroom:
+        result["value"] = "1R"
+    elif layout_items:
         # 重複を除去してソート
         unique_layouts = list(set(layout_items))
-        unique_layouts.sort()
+        
+        # 間取りの適切な順序でソート（2LDK → 2LDK+S → 2LDK+1S → 3LDK → ...）
+        def layout_sort_key(layout):
+            # 数字を抽出
+            num_match = re.match(r'^(\d+)', layout)
+            if num_match:
+                num = int(num_match.group(1))
+                # Rの場合は特別に小さい値を設定
+                if 'R' in layout and 'LDK' not in layout:
+                    return (num, 0, 0, layout)  # 1R → (1, 0, 0, "1R")
+                elif 'LDK' in layout:
+                    # +が付いていない基本LDKを先にソート
+                    if '+' in layout or '＋' in layout:
+                        # +の後の内容でさらにソート（S が 1S より先）
+                        plus_part = layout.split('+')[1] if '+' in layout else layout.split('＋')[1]
+                        # 数字のないもの（S）を数字があるもの（1S）より先にソート
+                        has_number_after_plus = re.search(r'\d', plus_part)
+                        if has_number_after_plus:
+                            return (num, 1, 2, layout)  # 2LDK+1S → (2, 1, 2, "2LDK+1S")
+                        else:
+                            return (num, 1, 1, layout)  # 2LDK+S → (2, 1, 1, "2LDK+S")
+                    else:
+                        return (num, 1, 0, layout)  # 3LDK → (3, 1, 0, "3LDK")
+                else:
+                    return (num, 2, 0, layout)  # その他 → (num, 2, 0, layout)
+            return (999, 999, 999, layout)  # 数字が見つからない場合
+        
+        unique_layouts.sort(key=layout_sort_key)
         result["values"] = unique_layouts
     else:
         result["value"] = value
@@ -568,13 +804,27 @@ def clean_date_to_json(value: str, period: Optional[int] = None) -> Dict[str, An
     日付情報をJSON形式でクレンジング
     例: "2023年12月下旬" -> {"year": 2023, "month": 12, "period_text": "下旬", "period": 4}
     """
-    if not value or value.strip() == "" or _should_nullify_text(value.strip()):
+    if not value or value.strip() == "":
         result = {"value": None}
         if period is not None:
             result["period"] = period
         return result
     
     value = value.strip()
+    
+    # 未定の場合（_should_nullify_textより先に処理）
+    if value == "未定":
+        result = {"is_undefined": True}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # その他のnullifyケース
+    if _should_nullify_text(value):
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
     result = {}
     
     # 年月日を抽出（日付がある場合）
@@ -622,11 +872,16 @@ def clean_date_to_json(value: str, period: Optional[int] = None) -> Dict[str, An
     # 即入居可などの特殊ケース
     if "即" in value:
         result["immediate"] = True
+        # 即日の場合は他のフィールドをクリアしてimmediateのみ返す
+        if value == "即日":
+            result = {"immediate": True}
+    
     
     if period is not None:
         result["period"] = period
     
     return result
+
 
 def clean_management_fee_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
     """
@@ -643,15 +898,15 @@ def clean_management_fee_to_json(value: str, raw_key: str = "", period: Optional
     value = value.strip()
     result = {}
     
-    # 「未定」「金額未定」などのケース（勤務形態未定は除く）
-    undefined_keywords = ["金額未定", "価格未定", "未確定", "未決定", "要相談", "応相談"]
-    if any(word in value for word in undefined_keywords) or \
-       (value.strip() == "未定"):  # 「未定」単体の場合のみ
-        result["is_undefined"] = True
-        result["value"] = None
+    # 「無」の場合は0として処理
+    if value == "無":
+        result["value"] = 0
         if period is not None:
             result["period"] = period
         return result
+    
+    # 複数項目がある場合は先に分離処理を行う
+    # その後で各項目内容の処理（未定、金額等）を行う
     
     # 管理体制情報を抽出
     if "自主管理" in value:
@@ -675,56 +930,297 @@ def clean_management_fee_to_json(value: str, raw_key: str = "", period: Optional
             result["work_style"] = work_type
             break
     
-    # 括弧内の追加情報を抽出（管理体制・勤務形態・一括払い以外）
-    paren_matches = re.findall(r'[（(]([^）)]*)[）)]', value)
-    for note_text in paren_matches:
-        # 管理体制・勤務形態・一括払い情報でない場合はnoteとして保存
-        is_excluded = any(keyword in note_text for keyword in 
-                         ["自主管理", "委託", "通勤", "巡回", "常駐", "管理員", "勤務形態", "一括"])
-        if not is_excluded and note_text.strip():
-            result["note"] = note_text.strip()
+    # 特殊パターン1：※記号で注記がある場合
+    if '※' in value:
+        note_idx = value.index('※')
+        main_part = value[:note_idx].strip()
+        note_part = value[note_idx+1:].strip()
+        
+        # メイン部分から金額を抽出
+        amount_match = re.search(r'(\d+(?:万\d+)?(?:,\d{3})*)円', main_part)
+        if amount_match:
+            amount_str = amount_match.group(1)
+            # 金額をパース
+            if '万' in amount_str:
+                man_match = re.match(r'(\d+)万(\d+)', amount_str)
+                if man_match:
+                    amount = int(man_match.group(1)) * 10000 + int(man_match.group(2))
+                else:
+                    amount = int(amount_str.replace(',', '').replace('万', '')) * 10000
+            else:
+                amount = int(amount_str.replace(',', ''))
+            
+            result["value"] = amount
+            result["unit"] = "円"
+            result["frequency"] = "月" if "月" in main_part else "一括"
+            result["note"] = note_part
+            
+            if period is not None:
+                result["period"] = period
+            return result
     
-    # 内訳がある場合は分離して処理
-    breakdown_match = re.search(r'【内訳】(.+)$', value)
-    if breakdown_match:
-        main_part = value[:breakdown_match.start()].strip()
-        breakdown_part = breakdown_match.group(1)
-        result["breakdown"] = breakdown_part
+    # 特殊パターン1.5：「当初月額X円／月、段階増額方式」のようなパターン
+    stage_pattern = re.match(r'^当初月額(\d+(?:万\d+)?(?:,\d{3})*)円／月、(.+)$', value)
+    if stage_pattern:
+        amount_str = stage_pattern.group(1)
+        note_text = stage_pattern.group(2)
+        
+        # 金額をパース
+        if '万' in amount_str:
+            man_match = re.match(r'(\d+)万(\d+)', amount_str)
+            if man_match:
+                amount = int(man_match.group(1)) * 10000 + int(man_match.group(2))
+            else:
+                amount = int(amount_str.replace(',', '').replace('万', '')) * 10000
+        else:
+            amount = int(amount_str.replace(',', ''))
+        
+        result["value"] = amount
+        result["unit"] = "円"
+        result["frequency"] = "月"
+        result["note"] = note_text
+        
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 特殊パターン2：「X円／月（Y年目のみZ円／月）」のような期間限定特別料金パターン
+    period_special_pattern = re.match(r'^(\d+(?:万\d+)?(?:,\d{3})*)円／月（([^）]+のみ\d+(?:万\d+)?(?:,\d{3})*円／月)）$', value)
+    if period_special_pattern:
+        # メインの金額を値として取る（期間限定は注記扱い）
+        main_amount_str = period_special_pattern.group(1)
+        note_text = period_special_pattern.group(2)
+        
+        # 金額をパース
+        if '万' in main_amount_str:
+            man_match = re.match(r'(\d+)万(\d+)', main_amount_str)
+            if man_match:
+                main_amount = int(man_match.group(1)) * 10000 + int(man_match.group(2))
+            else:
+                main_amount = int(main_amount_str.replace(',', '').replace('万', '')) * 10000
+        else:
+            main_amount = int(main_amount_str.replace(',', ''))
+        
+        result["value"] = main_amount
+        result["unit"] = "円"
+        result["frequency"] = "月"
+        result["note"] = note_text
+        
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 特殊パターン2.5：「X円／月（契約時）、Y」のような形式の処理
+    special_pattern = re.match(r'^(\d+(?:万\d+)?(?:,\d{3})*)円／月（([^）]+)）(.*)$', value)
+    if special_pattern and '、' in value:
+        # 最初の金額を値として取る
+        first_amount_str = special_pattern.group(1)
+        note_start = special_pattern.group(2)  # 括弧内の内容
+        remaining = special_pattern.group(3)   # 括弧後の内容
+        
+        # 金額をパース
+        if '万' in first_amount_str:
+            man_match = re.match(r'(\d+)万(\d+)', first_amount_str)
+            if man_match:
+                first_amount = int(man_match.group(1)) * 10000 + int(man_match.group(2))
+            else:
+                first_amount = int(first_amount_str.replace(',', '').replace('万', '')) * 10000
+        else:
+            first_amount = int(first_amount_str.replace(',', ''))
+        
+        result["value"] = first_amount
+        result["unit"] = "円"
+        result["frequency"] = "月"
+        result["note"] = f"（{note_start}）{remaining}"
+        
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 特殊パターン3：括弧内に期間変更情報がある場合（年目より、年後より、など）
+    paren_match = re.search(r'(\d+(?:万\d+)?(?:,\d{3})*)円／月[（(]([^）)]*(?:年目|年後|カ月目|カ月後)より[^）)]*)[）)]', value)
+    if paren_match:
+        amount_str = paren_match.group(1)
+        note_text = paren_match.group(2)
+        
+        # 金額をパース
+        if '万' in amount_str:
+            man_match = re.match(r'(\d+)万(\d+)', amount_str)
+            if man_match:
+                amount = int(man_match.group(1)) * 10000 + int(man_match.group(2))
+            else:
+                amount = int(amount_str.replace(',', '').replace('万', '')) * 10000
+        else:
+            amount = int(amount_str.replace(',', ''))
+        
+        result["value"] = amount
+        result["unit"] = "円"
+        result["frequency"] = "月"
+        result["note"] = note_text
+        
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 複数パターンがある場合の処理
+    # 「、」で区切られた複数の管理費項目の場合
+    if '、' in value:
+        parts = value.split('、')
+        
+        # 完全に異なる項目種別（修繕積立基金等）が含まれる場合は最初の項目のみ処理
+        # ただし、管理準備金の「住宅一部」と「全体」の組み合わせは統合処理する
+        has_different_items = False
+        for part in parts[1:]:  # 2番目以降をチェック
+            if any(keyword in part for keyword in ["修繕積立基金", "全体修繕", "団地"]):
+                has_different_items = True
+                break
+            # 管理準備金の場合は「住宅一部」と「全体」の組み合わせをチェック
+            if "管理準備金" in part:
+                # 最初の項目も管理準備金で、住宅一部+全体の組み合わせかチェック
+                first_part = parts[0]
+                if ("住宅一部" in first_part and "全体" in part) or ("一部" in first_part and "全体" in part):
+                    # この場合は統合処理（has_different_items = False のまま）
+                    pass
+                else:
+                    has_different_items = True
+                    break
+        
+        if has_different_items:
+            # 最初の項目のみを処理対象とする
+            main_part = parts[0].strip()
+            # 後続の項目を注記として保存
+            if len(parts) > 1:
+                note_parts = []
+                for part in parts[1:]:
+                    note_parts.append(part.strip())
+                result["note"] = "、".join(note_parts)
+            use_all_amounts = False
+        else:
+            # 同一項目の複数範囲の場合は従来通り全額処理
+            # 各項目の注記を収集
+            notes = []
+            for part in parts:
+                part = part.strip()
+                # 複数の括弧がある場合は最後の括弧を取得
+                paren_matches = re.findall(r'[（(]([^）)]*)[）)]', part)
+                if paren_matches:
+                    # 最後の括弧内容を注記として使用
+                    note_text = paren_matches[-1]
+                    if any(keyword in note_text for keyword in ["修繕", "積立", "基金", "準備金", "住宅", "団地", "街区"]):
+                        notes.append(note_text)
+            
+            # 複数の注記がある場合は「・」で結合
+            if notes:
+                result["note"] = "・".join(notes)
+            
+            # 複数の項目がある場合、全ての金額を収集して最小・最大を取る
+            all_amounts = []
+            for part in parts:
+                part = part.strip()
+                # 各パートから金額を抽出
+                # パターン1: 「1万7744円」のような形式
+                man_pattern = re.findall(r'(\d+)万(\d+)円', part)
+                for man_part, remaining_part in man_pattern:
+                    total_amount = int(man_part) * 10000 + int(remaining_part)
+                    all_amounts.append(total_amount)
+                
+                # パターン2: 「万円」単位（「10万円」など）
+                man_only_pattern = re.findall(r'(\d+(?:,\d{3})*)万円', part)
+                for man_str in man_only_pattern:
+                    # 既にパターン1で処理されていないかチェック
+                    already_processed = False
+                    for m, r in man_pattern:
+                        if man_str == m:
+                            already_processed = True
+                            break
+                    if not already_processed:
+                        all_amounts.append(int(man_str.replace(',', '')) * 10000)
+                
+                # パターン3: 通常の円表記
+                yen_pattern = re.findall(r'(\d+(?:,\d{3})*)円', part)
+                for yen_str in yen_pattern:
+                    # 万円パターンに含まれていない場合のみ追加
+                    already_processed = False
+                    for m, r in man_pattern:
+                        if yen_str == r:
+                            already_processed = True
+                            break
+                    if not already_processed:
+                        all_amounts.append(int(yen_str.replace(',', '')))
+            
+            # 全額を処理
+            main_part = value  # 後続の処理のために全体を保持
+            # 既に収集した金額を使用するフラグ
+            use_all_amounts = True
     else:
-        main_part = value
+        # 単一項目の場合は注記処理を実行
+        # 括弧内の追加情報を抽出（管理体制・勤務形態・一括払い以外）
+        paren_matches = re.findall(r'[（(]([^）)]*)[）)]', value)
+        for note_text in paren_matches:
+            # 管理体制・勤務形態・一括払い情報でない場合はnoteとして保存
+            is_excluded = any(keyword in note_text for keyword in 
+                             ["自主管理", "委託", "通勤", "巡回", "常駐", "管理員", "勤務形態", "一括"])
+            if not is_excluded and note_text.strip():
+                result["note"] = note_text.strip()
+        
+        # 内訳がある場合は分離して処理
+        breakdown_match = re.search(r'【内訳】(.+)$', value)
+        if breakdown_match:
+            main_part = value[:breakdown_match.start()].strip()
+            breakdown_part = breakdown_match.group(1)
+            result["breakdown"] = breakdown_part
+        else:
+            main_part = value
+        use_all_amounts = False
+    
+    # 「未定」「金額未定」などのケース（勤務形態未定は除く）
+    # 複数項目の場合でも未定があれば処理
+    undefined_keywords = ["金額未定", "価格未定", "未確定", "未決定", "要相談", "応相談"]
+    if any(word in value for word in undefined_keywords) or \
+       (value.strip() == "未定"):  # 「未定」単体の場合のみ
+        result["is_undefined"] = True
+        result["value"] = None
+        if period is not None:
+            result["period"] = period
+        return result
     
     # メイン部分から金額を抽出（「万」を含む場合を正しく処理）
-    amounts = []
-    
-    # パターン1: 「1万7744円」のような形式
-    man_pattern = re.findall(r'(\d+)万(\d+)円', main_part)
-    for man_part, remaining_part in man_pattern:
-        total_amount = int(man_part) * 10000 + int(remaining_part)
-        amounts.append(total_amount)
-    
-    # パターン2: 「万円」単位（「10万円」など）
-    man_only_pattern = re.findall(r'(\d+(?:,\d{3})*)万円', main_part)
-    for man_str in man_only_pattern:
-        # 既にパターン1で処理されていないかチェック
-        already_processed = False
-        for m, r in man_pattern:
-            if man_str == m:
-                already_processed = True
-                break
-        if not already_processed:
-            amounts.append(int(man_str.replace(',', '')) * 10000)
-    
-    # パターン3: 通常の円表記
-    yen_pattern = re.findall(r'(\d+(?:,\d{3})*)円', main_part)
-    for yen_str in yen_pattern:
-        # 万円パターンに含まれていない場合のみ追加
-        already_processed = False
-        for m, r in man_pattern:
-            if yen_str == r:
-                already_processed = True
-                break
-        if not already_processed:
-            amounts.append(int(yen_str.replace(',', '')))
+    if 'use_all_amounts' in locals() and use_all_amounts and all_amounts:
+        # 既に収集した金額を使用
+        amounts = all_amounts
+    else:
+        # 通常の金額抽出処理
+        amounts = []
+        
+        # パターン1: 「1万7744円」のような形式
+        man_pattern = re.findall(r'(\d+)万(\d+)円', main_part)
+        for man_part, remaining_part in man_pattern:
+            total_amount = int(man_part) * 10000 + int(remaining_part)
+            amounts.append(total_amount)
+        
+        # パターン2: 「万円」単位（「10万円」など）
+        man_only_pattern = re.findall(r'(\d+(?:,\d{3})*)万円', main_part)
+        for man_str in man_only_pattern:
+            # 既にパターン1で処理されていないかチェック
+            already_processed = False
+            for m, r in man_pattern:
+                if man_str == m:
+                    already_processed = True
+                    break
+            if not already_processed:
+                amounts.append(int(man_str.replace(',', '')) * 10000)
+        
+        # パターン3: 通常の円表記
+        yen_pattern = re.findall(r'(\d+(?:,\d{3})*)円', main_part)
+        for yen_str in yen_pattern:
+            # 万円パターンに含まれていない場合のみ追加
+            already_processed = False
+            for m, r in man_pattern:
+                if yen_str == r:
+                    already_processed = True
+                    break
+            if not already_processed:
+                amounts.append(int(yen_str.replace(',', '')))
     
     if amounts:
         if len(amounts) == 1:
@@ -1052,13 +1548,20 @@ def clean_other_expenses_to_json(value: str, period: Optional[int] = None) -> Di
     
     # 抽出対象のキーワードパターン
     target_patterns = {
-        "駐車場": r'(.*駐車場[^：]*)[:：]\s*([0-9万,～〜円]+)(?:[／/](.+))?',
-        "地代": r'(地代)[:：]\s*([0-9万,～〜円]+)(?:[／/](.+))?',
-        "敷金": r'(敷金)[:：]\s*([0-9万,～〜円]+)(?:[／/](.+))?',
-        "保証金": r'(.*保証金[^：]*)[:：]\s*([0-9万,～〜円]+)(?:[／/](.+))?',
-        "解体": r'(.*解体[^：]*)[:：]\s*([0-9万,～〜円]+)(?:[／/](.+))?',
-        "災害積立": r'(災害積立[^：]*)[:：]\s*([0-9万,～〜円]+)(?:[／/](.+))?',
-        "メンテナンス": r'(.*メンテナンス[^：]*)[:：]\s*([0-9万,～〜円]+)(?:[／/](.+))?'
+        "駐車場": r'(.*駐車場[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "地代": r'(.*地代)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "敷金": r'(敷金)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "保証金": r'(.*保証金[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "解体": r'(.*解体[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "災害積立": r'(災害積立[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "メンテナンス": r'(.*メンテナンス[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "通信費": r'(.*(?:インターネット|ネット|ＣＡＴＶ|CATV|TV|テレビ|フレッツ)[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "管理費": r'(管理一時金[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "利用料": r'(.*(?:利用料|使用料|専用利用料)[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "自治会費": r'(.*(?:町会費|町内会費|自治会費)[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "セキュリティ": r'(.*(?:セキュリティ|防犯|警備)[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "コミュニティ": r'(.*(?:コミュニティ|会費)[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?',
+        "サービス": r'(.*(?:サービス)[^：]*)[:：]\s*([0-9万,～〜円未定]+)(?:[／/](.+))?'
     }
     
     found_any = False
@@ -1075,14 +1578,38 @@ def clean_other_expenses_to_json(value: str, period: Optional[int] = None) -> Di
                 frequency_str = match.group(3).strip() if match.group(3) else ""
                 
                 # 金額を解析
-                expense_item = {"name": item_name, "category": category}
+                # 通信費の場合は名前を統一
+                if category == "通信費":
+                    if any(word in item_name for word in ["インターネット", "ネット", "NET"]):
+                        normalized_name = "インターネット"
+                    elif "ＣＡＴＶ" in item_name or "CATV" in item_name:
+                        normalized_name = "CATV"
+                    elif "TV" in item_name or "テレビ" in item_name:
+                        normalized_name = "テレビ"
+                    elif "フレッツ" in item_name:
+                        normalized_name = "フレッツ光"
+                    else:
+                        normalized_name = item_name
+                    expense_item = {"name": normalized_name, "category": category}
+                else:
+                    expense_item = {"name": item_name, "category": category}
                 
                 # 未定の場合
                 if "未定" in amount_str or "金額未定" in amount_str:
                     expense_item["is_undefined"] = True
                     expense_item["value"] = None
                     expense_item["unit"] = "円"
-                    expense_item["frequency"] = frequency_str if frequency_str else "月"
+                    if frequency_str:
+                        if "一括" in frequency_str:
+                            expense_item["frequency"] = "一括"
+                        elif "月" in frequency_str:
+                            expense_item["frequency"] = "月"
+                        elif "年" in frequency_str:
+                            expense_item["frequency"] = "年"
+                        else:
+                            expense_item["frequency"] = frequency_str
+                    else:
+                        expense_item["frequency"] = "月"
                     result["expenses"].append(expense_item)
                     found_any = True
                     break
@@ -1152,19 +1679,22 @@ def clean_other_expenses_to_json(value: str, period: Optional[int] = None) -> Di
                     
                     expense_item["unit"] = "円"
                     
-                    # 頻度の判定
+                    # 頻度の判定（金額直後の周期のみを優先、それ以外は無視）
                     if frequency_str:
-                        if "一括" in frequency_str:
+                        # 最初の単語のみを見る（括弧や注記は無視）
+                        first_word = frequency_str.split()[0] if frequency_str.split() else frequency_str
+                        first_word = re.sub(r'[（(].*', '', first_word)  # 括弧以降を削除
+                        
+                        if "一括" in first_word:
                             expense_item["frequency"] = "一括"
-                        elif "月" in frequency_str:
+                        elif "月" in first_word:
                             expense_item["frequency"] = "月"
-                        elif "年" in frequency_str:
+                        elif "年" in first_word:
                             expense_item["frequency"] = "年"
                         else:
-                            expense_item["frequency"] = frequency_str
+                            expense_item["frequency"] = "月"  # デフォルト
                     else:
-                        # デフォルトは月額と仮定
-                        expense_item["frequency"] = "月"
+                        expense_item["frequency"] = "月"  # デフォルト
                     
                     result["expenses"].append(expense_item)
                     found_any = True
@@ -1252,8 +1782,16 @@ def clean_expiry_date_to_json(value: str, period: Optional[int] = None) -> Dict[
         day = date_match.group(3).zfill(2)    # 0埋め
         result["date"] = f"{year}-{month}-{day}"
     else:
-        # パースできない場合は元の値を保持
-        result["date"] = value
+        # スラッシュ形式をパース（例: "2024/03/31"）
+        slash_date_match = re.search(r'(\d{4})/(\d{1,2})/(\d{1,2})', value)
+        if slash_date_match:
+            year = slash_date_match.group(1)
+            month = slash_date_match.group(2).zfill(2)  # 0埋め
+            day = slash_date_match.group(3).zfill(2)    # 0埋め
+            result["date"] = f"{year}-{month}-{day}"
+        else:
+            # パースできない場合は元の値を保持
+            result["date"] = value
     
     if period is not None:
         result["period"] = period
@@ -1521,6 +2059,27 @@ def create_type_schema(base_key: str, sample_values: List[str]) -> Dict[str, Any
     if "交通" in base_key or "アクセス" in base_key:
         return generate_access_type_schema()
     
+    # 建物構造の特殊処理（「構造・階建て」など）
+    if "構造" in base_key and "階建" in base_key and "所在階" not in base_key:
+        from .building_structure_parser import get_building_structure_analysis_schema
+        return get_building_structure_analysis_schema()
+    
+    # 駐車場の特殊処理
+    if "駐車場" in base_key:
+        from .parking_parser import get_parking_analysis_schema
+        return get_parking_analysis_schema()
+    
+    # 構造階建の特殊処理（「所在階/構造・階建」など）
+    structure_keywords = ["所在階", "構造", "階建"]
+    if any(keyword in base_key for keyword in structure_keywords):
+        from .structure_parser import get_structure_analysis_schema
+        return get_structure_analysis_schema()
+    
+    # リフォームの特殊処理
+    if "リフォーム" in base_key:
+        from .reform_parser import get_reform_analysis_schema
+        return get_reform_analysis_schema()
+    
     # 用途地域の特殊処理
     if "用途地域" in base_key:
         return {
@@ -1560,8 +2119,29 @@ def create_type_schema(base_key: str, sample_values: List[str]) -> Dict[str, Any
             "period_aware": has_period
         }
     
+    # 特徴ピックアップの特殊処理
+    if "特徴ピックアップ" in base_key or "物件の特徴" in base_key:
+        return generate_feature_pickup_type_schema()
+    
+    # 光熱費の特殊処理
+    if "目安光熱費" in base_key:
+        return generate_utility_cost_type_schema()
+    
+    # 強制null処理の特殊処理
+    force_null_keys = [
+        "物件名", "情報提供日", "次回更新日", "関連リンク", "お問い合せ先", 
+        "周辺施設", "イベント情報", "その他概要・特記事項", "敷地権利形態", "販売スケジュール"
+    ]
+    if any(key in base_key for key in force_null_keys):
+        return {
+            "base_type": "null",
+            "data_type": "force_null",
+            "fields": ["value"],
+            "period_aware": has_period
+        }
+    
     # 会社情報の特殊処理
-    if "会社情報" in base_key:
+    if "会社情報" in base_key or "会社概要" in base_key:
         return {
             "base_type": "array",
             "data_type": "company_info",
@@ -2490,3 +3070,826 @@ def generate_text_type_schema() -> Dict[str, Any]:
         ],
         "period_aware": True
     }
+
+def clean_utility_cost_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    目安光熱費をJSON形式でクレンジング
+    例: "約18.8万円～19万円/年" -> {"min": 18.8, "max": 19, "unit": "万円", "frequency": "年", "period": 4}
+    例: "約18.6万円/年" -> {"value": 18.6, "unit": "万円", "frequency": "年", "period": 4}
+    """
+    if not value or value.strip() == "":
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    value = value.strip()
+    result = {}
+    
+    # 「未定」「要相談」などのケース（_should_nullify_textより先にチェック）
+    if "未定" in value or "要相談" in value or value.strip() == "未定":
+        result["value"] = None
+        result["is_undefined"] = True
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 汎用的な無効データチェック（ただし「未定」は除外済み）
+    if _should_nullify_text(value):
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 「約」の表記を検出
+    if "約" in value:
+        result["approximate"] = True
+    
+    # 頻度を抽出（年、月など）
+    if "/年" in value or "年" in value:
+        result["frequency"] = "年"
+    elif "/月" in value or "月" in value:
+        result["frequency"] = "月"
+    
+    # 価格範囲の抽出
+    # パターン1: 「約18.8万円～19万円/年」
+    range_pattern = r'約?(\d+(?:\.\d+)?)万円～(\d+(?:\.\d+)?)万円'
+    range_match = re.search(range_pattern, value)
+    
+    if range_match:
+        min_val = float(range_match.group(1))
+        max_val = float(range_match.group(2))
+        result["min"] = min_val
+        result["max"] = max_val
+        result["unit"] = "万円"
+    else:
+        # パターン2: 「約18.6万円/年」
+        single_pattern = r'約?(\d+(?:\.\d+)?)万円'
+        single_match = re.search(single_pattern, value)
+        
+        if single_match:
+            val = float(single_match.group(1))
+            result["value"] = val
+            result["unit"] = "万円"
+        else:
+            # パターンにマッチしない場合は元の値を保存
+            result["value"] = value
+            result["parse_failed"] = True
+    
+    if period is not None:
+        result["period"] = period
+    
+    return result
+
+def clean_feature_pickup_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    特徴ピックアップをJSON形式で構造化
+    例: "土地50坪以上/角地/都市ガス" -> 構造化されたJSON
+    """
+    if not value or value.strip() == "":
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    value = value.strip()
+    
+    # 特徴ピックアップは長いリストになることがあるため、長さ制限をスキップ
+    # その他の無効データパターンのみチェック
+    if value.strip() in ["-", "－", "ー", "未定", "未設定", "なし", "無し", "N/A", ""]:
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 分析に重要でないパターンのチェック
+    unimportant_patterns = [
+        "■支払い例", "■ローンのご案内", "提携ローン", "※ローンは一定要件該当者が対象",
+        "※金利は", "融資限度額", "事務手数料", "保証料", "適用される金利は融資実行時",
+        "お申込みの際には、お認印", "収入証明書", "本人確認書類", "運転免許証",
+        "健康保険証", "パスポート", "先着順販売のため販売済の場合",
+        "販売開始まで契約または予約の申し込み", "申し込み順位の確保につながる行為は一切できません",
+        "確定情報は新規分譲広告において明示", "物件データは第", "期以降の全販売対象住戸",
+        "のものを表記", "受付時間／", "定休日／", "受付場所／", "マンションギャラリー"
+    ]
+    
+    for pattern in unimportant_patterns:
+        if pattern in value:
+            result = {"value": None}
+            if period is not None:
+                result["period"] = period
+            return result
+    
+    # スラッシュ区切りで特徴を分割（前後の空白も含めて）
+    features = [f.strip() for f in re.split(r'\s*/\s*', value) if f.strip()]
+    if not features:
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 構造化データの初期化
+    structured_features = {
+        "certifications": {},
+        "building_specs": {},
+        "equipment": {
+            "kitchen": [],
+            "bathroom": [],
+            "heating_cooling": [],
+            "utilities": [],
+            "security": [],
+            "other": []
+        },
+        "location_access": {},
+        "land_features": {},
+        "parking_transport": {},
+        "room_features": {},
+        "maintenance": {}
+    }
+    
+    feature_tags = []
+    
+    for feature in features:
+        feature_lower = feature.lower()
+        
+        # 認証・評価書系
+        if "設計住宅性能評価書" in feature:
+            structured_features["certifications"]["design_performance_evaluation"] = True
+            feature_tags.append("design_performance_cert")
+        elif "建設住宅性能評価書" in feature:
+            structured_features["certifications"]["construction_performance_evaluation"] = True
+            feature_tags.append("construction_performance_cert")
+        elif "長期優良住宅認定通知書" in feature:
+            structured_features["certifications"]["long_term_excellent_housing"] = True
+            feature_tags.append("long_term_excellent")
+        elif "フラット３５" in feature or "フラット35" in feature:
+            structured_features["certifications"]["flat35_s"] = True
+            feature_tags.append("flat35_s")
+        elif "bels" in feature_lower or "省エネ基準適合認定書" in feature:
+            structured_features["certifications"]["bels"] = True
+            feature_tags.append("bels")
+        elif "瑕疵保証" in feature:
+            structured_features["certifications"]["defect_warranty"] = True
+            feature_tags.append("defect_warranty")
+        
+        # 建物仕様系
+        elif "２階建" in feature or "2階建" in feature:
+            structured_features["building_specs"]["stories"] = 2
+            feature_tags.append("2_story")
+        elif "３階建以上" in feature or "3階建以上" in feature:
+            structured_features["building_specs"]["stories"] = 3
+            feature_tags.append("3_story_plus")
+        elif "南向き" in feature:
+            structured_features["building_specs"]["orientation"] = "south"
+            feature_tags.append("south_facing")
+        elif "東南向き" in feature:
+            structured_features["building_specs"]["orientation"] = "southeast"
+            feature_tags.append("southeast_facing")
+        elif "全室南向き" in feature:
+            structured_features["building_specs"]["all_rooms_south"] = True
+            feature_tags.append("all_rooms_south")
+        elif "陽当り良好" in feature:
+            structured_features["building_specs"]["good_sunlight"] = True
+            feature_tags.append("good_sunlight")
+        
+        # LDK面積
+        elif "ＬＤＫ１５畳以上" in feature or "LDK15畳以上" in feature:
+            structured_features["building_specs"]["ldk_size_tatami"] = {"min": 15}
+            feature_tags.append("ldk_15tatami_plus")
+        elif "ＬＤＫ１８畳以上" in feature or "LDK18畳以上" in feature:
+            structured_features["building_specs"]["ldk_size_tatami"] = {"min": 18}
+            feature_tags.append("ldk_18tatami_plus")
+        elif "ＬＤＫ２０畳以上" in feature or "LDK20畳以上" in feature:
+            structured_features["building_specs"]["ldk_size_tatami"] = {"min": 20}
+            feature_tags.append("ldk_20tatami_plus")
+        
+        # 設備系 - キッチン
+        elif "システムキッチン" in feature:
+            structured_features["equipment"]["kitchen"].append("system")
+            feature_tags.append("system_kitchen")
+        elif "対面式キッチン" in feature:
+            structured_features["equipment"]["kitchen"].append("counter_facing")
+            feature_tags.append("counter_kitchen")
+        elif "ＩＨクッキングヒーター" in feature or "IHクッキングヒーター" in feature:
+            structured_features["equipment"]["kitchen"].append("ih_cooktop")
+            feature_tags.append("ih_cooktop")
+        elif "食器洗乾燥機" in feature:
+            structured_features["equipment"]["kitchen"].append("dishwasher")
+            feature_tags.append("dishwasher")
+        elif "浄水器" in feature:
+            structured_features["equipment"]["kitchen"].append("water_purifier")
+            feature_tags.append("water_purifier")
+        
+        # 設備系 - 浴室
+        elif "浴室乾燥機" in feature:
+            structured_features["equipment"]["bathroom"].append("dryer")
+            feature_tags.append("bathroom_dryer")
+        elif "浴室１坪以上" in feature or "浴室1坪以上" in feature:
+            structured_features["building_specs"]["bathroom_size_tsubo"] = {"min": 1}
+            feature_tags.append("bathroom_1tsubo_plus")
+        elif "浴室に窓" in feature:
+            structured_features["equipment"]["bathroom"].append("window")
+            feature_tags.append("bathroom_window")
+        elif "オートバス" in feature:
+            structured_features["equipment"]["bathroom"].append("auto_bath")
+            feature_tags.append("auto_bath")
+        
+        # 設備系 - 暖房・冷房
+        elif "床暖房" in feature:
+            structured_features["equipment"]["heating_cooling"].append("floor_heating")
+            feature_tags.append("floor_heating")
+        elif "省エネルギー対策" in feature:
+            structured_features["equipment"]["heating_cooling"].append("energy_saving")
+            feature_tags.append("energy_saving")
+        elif "省エネ給湯器" in feature:
+            structured_features["equipment"]["heating_cooling"].append("energy_saving_water_heater")
+            feature_tags.append("energy_saving_heater")
+        
+        # 設備系 - ユーティリティ
+        elif "オール電化" in feature:
+            structured_features["equipment"]["utilities"].append("all_electric")
+            feature_tags.append("all_electric")
+        elif "都市ガス" in feature:
+            structured_features["equipment"]["utilities"].append("city_gas")
+            feature_tags.append("city_gas")
+        elif "エレベーター" in feature:
+            structured_features["equipment"]["utilities"].append("elevator")
+            feature_tags.append("elevator")
+        elif "複層ガラス" in feature:
+            structured_features["equipment"]["utilities"].append("double_glazing")
+            feature_tags.append("double_glazing")
+        
+        # 設備系 - セキュリティ
+        elif "セキュリティ充実" in feature:
+            structured_features["equipment"]["security"].append("enhanced")
+            feature_tags.append("security_enhanced")
+        elif "ＴＶモニタ付インターホン" in feature or "TVモニタ付インターホン" in feature:
+            structured_features["equipment"]["security"].append("tv_intercom")
+            feature_tags.append("tv_intercom")
+        elif "スマートキー" in feature:
+            structured_features["equipment"]["security"].append("smart_key")
+            feature_tags.append("smart_key")
+        
+        # 立地・アクセス系
+        elif "スーパー 徒歩10分以内" in feature or "スーパー徒歩10分以内" in feature:
+            structured_features["location_access"]["supermarket_walk_min"] = {"max": 10}
+            feature_tags.append("supermarket_walk_10min")
+        elif "小学校 徒歩10分以内" in feature or "小学校徒歩10分以内" in feature:
+            structured_features["location_access"]["elementary_school_walk_min"] = {"max": 10}
+            feature_tags.append("school_walk_10min")
+        elif "駅まで平坦" in feature:
+            structured_features["location_access"]["station_flat_access"] = True
+            feature_tags.append("station_flat")
+        elif "閑静な住宅地" in feature:
+            structured_features["location_access"]["quiet_residential"] = True
+            feature_tags.append("quiet_area")
+        elif "緑豊かな住宅地" in feature:
+            structured_features["location_access"]["green_residential"] = True
+            feature_tags.append("green_area")
+        elif "２沿線以上利用可" in feature or "2沿線以上利用可" in feature:
+            structured_features["parking_transport"]["multiple_rail_lines"] = True
+            feature_tags.append("multiple_lines")
+        
+        # 土地特徴系
+        elif "土地50坪以上" in feature or "土地５０坪以上" in feature:
+            structured_features["land_features"]["area_tsubo"] = {"min": 50}
+            feature_tags.append("land_50tsubo_plus")
+        elif "角地" in feature:
+            structured_features["land_features"]["corner_lot"] = True
+            feature_tags.append("corner_lot")
+        elif "南側道路面す" in feature:
+            structured_features["land_features"]["south_facing_road"] = True
+            feature_tags.append("south_road")
+        elif "前道６ｍ以上" in feature or "前道6m以上" in feature:
+            structured_features["land_features"]["road_width_m"] = {"min": 6}
+            feature_tags.append("road_6m_plus")
+        elif "整形地" in feature:
+            structured_features["land_features"]["regular_shape"] = True
+            feature_tags.append("regular_shape")
+        elif "平坦地" in feature:
+            structured_features["land_features"]["flat_land"] = True
+            feature_tags.append("flat_land")
+        
+        # 駐車場・交通系
+        elif "駐車２台可" in feature or "駐車2台可" in feature:
+            structured_features["parking_transport"]["parking_capacity"] = 2
+            feature_tags.append("parking_2cars")
+        elif "駐車３台以上可" in feature or "駐車3台以上可" in feature:
+            structured_features["parking_transport"]["parking_capacity"] = 3
+            feature_tags.append("parking_3cars_plus")
+        
+        # 室内特徴系（複合パターンを先に処理）
+        elif "最上階角住戸" in feature:
+            structured_features["room_features"]["corner_unit"] = True
+            structured_features["room_features"]["top_floor"] = True
+            feature_tags.append("top_floor_corner")
+        elif "角住戸" in feature:
+            structured_features["room_features"]["corner_unit"] = True
+            feature_tags.append("corner_unit")
+        elif "最上階" in feature:
+            structured_features["room_features"]["top_floor"] = True
+            feature_tags.append("top_floor")
+        elif "全居室収納" in feature:
+            structured_features["room_features"]["all_rooms_storage"] = True
+            feature_tags.append("all_rooms_storage")
+        elif "ウォークインクローゼット" in feature:
+            structured_features["room_features"]["walk_in_closet"] = True
+            feature_tags.append("walk_in_closet")
+        elif "トイレ２ヶ所" in feature or "トイレ2ヶ所" in feature:
+            structured_features["room_features"]["toilets_count"] = 2
+            feature_tags.append("2_toilets")
+        elif "和室" in feature:
+            structured_features["room_features"]["japanese_room"] = True
+            feature_tags.append("japanese_room")
+        elif "ペット相談" in feature:
+            structured_features["room_features"]["pet_negotiable"] = True
+            feature_tags.append("pet_ok")
+        
+        # メンテナンス・リフォーム系
+        elif "内装リフォーム" in feature:
+            structured_features["maintenance"]["interior_reform"] = True
+            feature_tags.append("interior_reform")
+        elif "外装リフォーム" in feature:
+            structured_features["maintenance"]["exterior_reform"] = True
+            feature_tags.append("exterior_reform")
+        elif "内外装リフォーム" in feature:
+            structured_features["maintenance"]["full_reform"] = True
+            feature_tags.append("full_reform")
+        
+        # 価格・販売関連情報
+        elif "分譲時の価格帯" in feature:
+            feature_tags.append("original_sale_price")
+        
+        # その他の特徴をタグとして保存
+        else:
+            # 特殊文字を除去してタグ化
+            tag = re.sub(r'[^\w\d]', '_', feature).lower()
+            if tag and tag not in feature_tags:
+                feature_tags.append(tag)
+    
+    # 空の辞書を削除
+    structured_features = {k: v for k, v in structured_features.items() if v}
+    for category in ["equipment"]:
+        if category in structured_features:
+            structured_features[category] = {k: v for k, v in structured_features[category].items() if v}
+    
+    # 期待される形式に合わせて、feature_tagsを日本語のままにする
+    result = {
+        "feature_tags": features,  # 元の日本語テキストをそのまま使用
+        "feature_count": len(features)
+    }
+    
+    if period is not None:
+        result["period"] = period
+    
+    return result
+
+def clean_rating_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    評価データをJSON形式でクレンジング
+    例: "5段階/7段階中" -> {"current_level": 5, "max_level": 7, "percentage": 71.4}
+    """
+    if not value or value.strip() == "" or value.strip() in ["-", "－"] or _should_nullify_text(value.strip()):
+        result = {"value": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    value = value.strip()
+    result = {}
+    
+    # 「X段階/Y段階中」のパターンをマッチ
+    rating_pattern = r'(\d+)段階/(\d+)段階中'
+    match = re.match(rating_pattern, value)
+    
+    if match:
+        current = int(match.group(1))
+        max_val = int(match.group(2))
+        
+        result["current_level"] = current
+        result["max_level"] = max_val
+        result["rating_text"] = value
+        
+        # パーセンテージ計算
+        if max_val > 0:
+            percentage = (current / max_val) * 100
+            result["percentage"] = round(percentage, 1)
+    else:
+        # パターンにマッチしない場合は元の値を保存
+        result["rating_text"] = value
+        result["parse_failed"] = True
+    
+    if period is not None:
+        result["period"] = period
+    
+    return result
+
+def generate_utility_cost_type_schema() -> Dict[str, Any]:
+    """
+    目安光熱費用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 光熱費用のtype情報
+    """
+    return {
+        "base_type": "range_or_single",
+        "data_type": "utility_cost",
+        "required_fields": ["period"],
+        "optional_fields": [
+            "min", "max", "value", "unit", "frequency", "approximate",
+            "is_undefined", "note", "parse_failed"
+        ],
+        "field_definitions": {
+            "min": {
+                "type": "number",
+                "description": "最小費用（万円単位）"
+            },
+            "max": {
+                "type": "number", 
+                "description": "最大費用（万円単位）"
+            },
+            "value": {
+                "type": "number",
+                "description": "単一費用値（万円単位）"
+            },
+            "unit": {
+                "type": "string",
+                "description": "単位（万円、円など）"
+            },
+            "frequency": {
+                "type": "string",
+                "description": "頻度（年、月など）"
+            },
+            "approximate": {
+                "type": "boolean",
+                "description": "概算値の場合true"
+            },
+            "is_undefined": {
+                "type": "boolean",
+                "description": "費用未定の場合true"
+            },
+            "parse_failed": {
+                "type": "boolean",
+                "description": "パース失敗の場合true"
+            },
+            "note": {
+                "type": "string",
+                "description": "費用に関する補足情報"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "年間費用範囲",
+                "value": {"min": 18.8, "max": 19, "unit": "万円", "frequency": "年", "approximate": True, "period": 4}
+            },
+            {
+                "description": "年間費用単一値",
+                "value": {"value": 18.6, "unit": "万円", "frequency": "年", "approximate": True, "period": 4}
+            },
+            {
+                "description": "費用未定",
+                "value": {"value": None, "is_undefined": True, "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "cost_range_analysis": {
+                "field": ["min", "max", "value"],
+                "description": "光熱費範囲分析"
+            },
+            "annual_cost_average": {
+                "field": "value",
+                "description": "年間平均光熱費"
+            },
+            "frequency_distribution": {
+                "field": "frequency",
+                "description": "光熱費算出頻度分布"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "年間光熱費平均",
+                "sql": "SELECT AVG(CASE WHEN JSON_EXTRACT(value_cleaned, '$.min') IS NOT NULL THEN (JSON_EXTRACT(value_cleaned, '$.min') + JSON_EXTRACT(value_cleaned, '$.max'))/2 ELSE JSON_EXTRACT(value_cleaned, '$.value') END) as avg_cost FROM estate_cleaned WHERE id_cleaned = [utility_cost_id] AND JSON_EXTRACT(value_cleaned, '$.frequency') = '年'"
+            },
+            {
+                "purpose": "光熱費範囲検索",
+                "sql": "SELECT * FROM estate_cleaned WHERE id_cleaned = [utility_cost_id] AND ((JSON_EXTRACT(value_cleaned, '$.min') IS NOT NULL AND JSON_EXTRACT(value_cleaned, '$.max') <= 20) OR (JSON_EXTRACT(value_cleaned, '$.value') IS NOT NULL AND JSON_EXTRACT(value_cleaned, '$.value') <= 20))"
+            },
+            {
+                "purpose": "概算費用物件抽出",
+                "sql": "SELECT * FROM estate_cleaned WHERE id_cleaned = [utility_cost_id] AND JSON_EXTRACT(value_cleaned, '$.approximate') = true"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_feature_pickup_type_schema() -> Dict[str, Any]:
+    """
+    特徴ピックアップ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 特徴ピックアップのtype情報
+    """
+    return {
+        "base_type": "structured_features",
+        "data_type": "features",
+        "required_fields": ["period"],
+        "optional_fields": [
+            "feature_tags", "structured_features", "raw_features", "feature_count"
+        ],
+        "field_definitions": {
+            "feature_tags": {
+                "type": "array",
+                "description": "特徴タグの配列",
+                "items": {"type": "string"}
+            },
+            "structured_features": {
+                "type": "object",
+                "description": "構造化された特徴情報",
+                "properties": {
+                    "certifications": {
+                        "type": "object",
+                        "description": "認証・評価書関連"
+                    },
+                    "building_specs": {
+                        "type": "object", 
+                        "description": "建物仕様関連"
+                    },
+                    "equipment": {
+                        "type": "object",
+                        "description": "設備関連",
+                        "properties": {
+                            "kitchen": {"type": "array"},
+                            "bathroom": {"type": "array"},
+                            "heating_cooling": {"type": "array"},
+                            "utilities": {"type": "array"},
+                            "security": {"type": "array"}
+                        }
+                    },
+                    "location_access": {
+                        "type": "object",
+                        "description": "立地・アクセス関連"
+                    },
+                    "land_features": {
+                        "type": "object",
+                        "description": "土地特徴関連"
+                    },
+                    "parking_transport": {
+                        "type": "object",
+                        "description": "駐車場・交通関連"
+                    },
+                    "room_features": {
+                        "type": "object",
+                        "description": "室内特徴関連"
+                    },
+                    "maintenance": {
+                        "type": "object",
+                        "description": "メンテナンス・リフォーム関連"
+                    }
+                }
+            },
+            "raw_features": {
+                "type": "array",
+                "description": "元の特徴文字列の配列",
+                "items": {"type": "string"}
+            },
+            "feature_count": {
+                "type": "integer",
+                "description": "特徴の総数"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "戸建住宅の特徴",
+                "value": {
+                    "feature_tags": ["land_50tsubo_plus", "corner_lot", "system_kitchen", "parking_2cars"],
+                    "structured_features": {
+                        "land_features": {"area_tsubo": {"min": 50}, "corner_lot": True},
+                        "equipment": {"kitchen": ["system"]},
+                        "parking_transport": {"parking_capacity": 2}
+                    },
+                    "raw_features": ["土地50坪以上", "角地", "システムキッチン", "駐車2台可"],
+                    "feature_count": 4,
+                    "period": 4
+                }
+            },
+            {
+                "description": "マンションの特徴",
+                "value": {
+                    "feature_tags": ["elevator", "corner_unit", "security_enhanced"],
+                    "structured_features": {
+                        "equipment": {"utilities": ["elevator"], "security": ["enhanced"]},
+                        "room_features": {"corner_unit": True}
+                    },
+                    "raw_features": ["エレベーター", "角住戸", "セキュリティ充実"],
+                    "feature_count": 3,
+                    "period": 4
+                }
+            }
+        ],
+        "analysis_keys": {
+            "feature_frequency": {
+                "field": "feature_tags",
+                "description": "特徴頻度分析"
+            },
+            "equipment_analysis": {
+                "field": ["structured_features", "equipment"],
+                "description": "設備分析"
+            },
+            "certification_analysis": {
+                "field": ["structured_features", "certifications"],
+                "description": "認証・評価分析"
+            },
+            "location_analysis": {
+                "field": ["structured_features", "location_access"],
+                "description": "立地・アクセス分析"
+            },
+            "land_analysis": {
+                "field": ["structured_features", "land_features"],
+                "description": "土地特徴分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "特定の特徴を持つ物件検索",
+                "sql": "SELECT * FROM estate_cleaned WHERE id_cleaned = [feature_id] AND JSON_EXTRACT(value_cleaned, '$.feature_tags') LIKE '%elevator%'"
+            },
+            {
+                "purpose": "駐車場台数別集計",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.structured_features.parking_transport.parking_capacity') as parking_capacity, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [feature_id] GROUP BY parking_capacity"
+            },
+            {
+                "purpose": "認証取得物件抽出",
+                "sql": "SELECT * FROM estate_cleaned WHERE id_cleaned = [feature_id] AND JSON_EXTRACT(value_cleaned, '$.structured_features.certifications') IS NOT NULL"
+            },
+            {
+                "purpose": "特徴数による分析",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.feature_count') as feature_count, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [feature_id] GROUP BY feature_count ORDER BY feature_count"
+            },
+            {
+                "purpose": "LDK面積別集計",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.structured_features.building_specs.ldk_size_tatami.min') as ldk_size, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [feature_id] AND JSON_EXTRACT(value_cleaned, '$.structured_features.building_specs.ldk_size_tatami') IS NOT NULL GROUP BY ldk_size"
+            }
+        ],
+        "period_aware": True
+    }
+
+def generate_rating_type_schema() -> Dict[str, Any]:
+    """
+    評価・格付けデータ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: 評価データ用のtype情報
+    """
+    return {
+        "base_type": "rating_scale",
+        "data_type": "rating",
+        "required_fields": ["period"],
+        "optional_fields": [
+            "current_level", "max_level", "rating_text", "percentage",
+            "is_undefined", "note", "parse_failed", "value"
+        ],
+        "field_definitions": {
+            "current_level": {
+                "type": "number",
+                "description": "現在の評価レベル（例: 5段階中の5）"
+            },
+            "max_level": {
+                "type": "number",
+                "description": "最大評価レベル（例: 7段階中の7）"
+            },
+            "rating_text": {
+                "type": "string",
+                "description": "評価の文字列表現（例: 5段階/7段階中）"
+            },
+            "percentage": {
+                "type": "number",
+                "description": "パーセンテージ換算値（0-100）"
+            },
+            "value": {
+                "type": "null",
+                "description": "評価なしの場合null"
+            },
+            "is_undefined": {
+                "type": "boolean",
+                "description": "評価未定の場合true"
+            },
+            "parse_failed": {
+                "type": "boolean",
+                "description": "パース失敗の場合true"
+            },
+            "note": {
+                "type": "string",
+                "description": "評価に関する補足情報"
+            },
+            "period": {
+                "type": "integer",
+                "description": "期別情報"
+            }
+        },
+        "examples": [
+            {
+                "description": "断熱性能評価",
+                "value": {"current_level": 5, "max_level": 7, "rating_text": "5段階/7段階中", "percentage": 71.4, "period": 4}
+            },
+            {
+                "description": "最高評価",
+                "value": {"current_level": 7, "max_level": 7, "rating_text": "7段階/7段階中", "percentage": 100, "period": 4}
+            },
+            {
+                "description": "評価なし",
+                "value": {"value": None, "period": 4}
+            }
+        ],
+        "analysis_keys": {
+            "rating_distribution": {
+                "field": ["current_level", "max_level"],
+                "description": "評価レベル分布分析"
+            },
+            "performance_score": {
+                "field": "percentage",
+                "description": "性能スコア分析"
+            },
+            "rating_scale_analysis": {
+                "field": "max_level",
+                "description": "評価スケール別分析"
+            }
+        },
+        "sql_examples": [
+            {
+                "purpose": "平均評価レベル",
+                "sql": "SELECT AVG(JSON_EXTRACT(value_cleaned, '$.current_level')) as avg_level, AVG(JSON_EXTRACT(value_cleaned, '$.max_level')) as avg_max FROM estate_cleaned WHERE id_cleaned = [rating_id] AND JSON_EXTRACT(value_cleaned, '$.current_level') IS NOT NULL"
+            },
+            {
+                "purpose": "評価分布",
+                "sql": "SELECT JSON_EXTRACT(value_cleaned, '$.current_level') as level, COUNT(*) FROM estate_cleaned WHERE id_cleaned = [rating_id] GROUP BY level ORDER BY level"
+            },
+            {
+                "purpose": "高評価物件抽出",
+                "sql": "SELECT * FROM estate_cleaned WHERE id_cleaned = [rating_id] AND (JSON_EXTRACT(value_cleaned, '$.current_level') / JSON_EXTRACT(value_cleaned, '$.max_level')) >= 0.8"
+            }
+        ],
+        "period_aware": True
+    }
+
+def clean_structure_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    構造・階建情報をJSON形式でクレンジング
+    「所在階/構造・階建」データを構造化JSONに変換
+    """
+    from .structure_parser import parse_floor_structure_to_json
+    return parse_floor_structure_to_json(value, period)
+
+def clean_reform_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    リフォーム情報をJSON形式でクレンジング
+    完了日付、リフォーム箇所等を構造化
+    """
+    from .reform_parser import parse_reform_to_json
+    return parse_reform_to_json(value, period)
+
+def clean_building_structure_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    建物構造・階建て情報をJSON形式でクレンジング
+    「構造・階建て」データを構造化
+    """
+    from .building_structure_parser import parse_building_structure_to_json
+    return parse_building_structure_to_json(value, period)
+
+def clean_parking_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    駐車場情報をJSON形式でクレンジング
+    空き状況、料金、台数等を構造化
+    """
+    from .parking_parser import parse_parking_to_json
+    return parse_parking_to_json(value, period)
+
+def clean_land_use_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    地目情報をJSON形式でクレンジング
+    複数地目をリスト形式で処理
+    """
+    return parse_land_use_to_json(value, period)
+
+def clean_floor_plan_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    間取り図情報をJSON形式でクレンジング
+    物件詳細情報を構造化して処理
+    """
+    from .floor_plan_parser import parse_floor_plan_to_json
+    return parse_floor_plan_to_json(value, period)
+
+def clean_building_coverage_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    建ぺい率・容積率情報をJSON形式でクレンジング
+    建ぺい率と容積率を数値化して処理
+    """
+    from .building_coverage_parser import parse_building_coverage_to_json
+    return parse_building_coverage_to_json(value, period)

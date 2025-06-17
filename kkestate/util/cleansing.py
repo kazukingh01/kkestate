@@ -24,8 +24,16 @@ def clean_price(value: str) -> Optional[Dict[str, Any]]:
         result["status"] = "undecided"
         return result
     
-    # 数値を抽出
-    numbers = re.findall(r'(\d+(?:,\d{3})*(?:\.\d+)?)', value)
+    # 最初の価格範囲部分のみを抽出（XX万円～YY万円 または XX万円）
+    price_range_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?万\d*円)(?:～(\d+(?:,\d{3})*(?:\.\d+)?万\d*円))?', value)
+    if price_range_match:
+        # 抽出した価格範囲部分のみを処理対象とする
+        price_text = price_range_match.group(0)
+        numbers = re.findall(r'(\d+(?:,\d{3})*(?:\.\d+)?)', price_text)
+    else:
+        # 従来通り全体から数値を抽出（後方互換性のため）
+        numbers = re.findall(r'(\d+(?:,\d{3})*(?:\.\d+)?)', value)
+    
     if not numbers:
         return result
     
