@@ -495,12 +495,7 @@ def clean_area_to_json(value: str, period: Optional[int] = None) -> Dict[str, An
         # 最初の数値を面積として扱い、2番目があれば坪数として扱う
         result["value"] = clean_numbers[0]
         
-        # 坪数が明示的に書かれている場合（例：43.27m2（13.08坪））
-        if len(clean_numbers) >= 2 and "坪" in value and result["unit"] == "m^2":
-            # 坪の数値を直接使用
-            tsubo_match = re.search(r'(\d+(?:\.\d+)?)坪', value)
-            if tsubo_match:
-                result["tsubo"] = float(tsubo_match.group(1))
+        # tsuboの値は削除（ユーザーのリクエストにより不要）
     
     # 測定タイプ（壁芯・登記）を抽出
     if "壁芯" in value:
@@ -508,14 +503,7 @@ def clean_area_to_json(value: str, period: Optional[int] = None) -> Dict[str, An
     elif "登記" in value:
         result["measurement_type"] = "登記"
     
-    # 坪数を計算（m^2の場合で、まだ設定されていない場合）
-    if result["unit"] == "m^2" and "tsubo" not in result:
-        if "value" in result:
-            result["tsubo"] = round(result["value"] / 3.30579, 2)
-        if "min" in result:
-            result["min_tsubo"] = round(result["min"] / 3.30579, 2)
-        if "max" in result:
-            result["max_tsubo"] = round(result["max"] / 3.30579, 2)
+    # tsuboの計算は削除（ユーザーのリクエストにより不要）
     
     if period is not None:
         result["period"] = period
@@ -576,9 +564,7 @@ def clean_multiple_area_to_json(value: str, period: Optional[int] = None) -> Dic
         else:
             area_info["unit"] = "m^2"  # デフォルト
         
-        # 坪数を計算
-        if area_info["unit"] == "m^2":
-            area_info["tsubo"] = round(area_info["value"] / 3.30579, 2)
+        # tsuboの計算は削除（ユーザーのリクエストにより不要）
         
         # 使用料を抽出
         # パターン1: 使用料1500円

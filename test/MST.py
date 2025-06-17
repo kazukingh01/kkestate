@@ -11,2018 +11,2060 @@ from kkestate.util.json_cleaner import (
     clean_floor_plan_to_json
 )
 
+__all__ = [
+    "EXPECTED_KEY_PROCESSING",
+    "EXPECTED_SCHEMAS",
+    "TEST_CASES_ADDRESS",
+    "TEST_CASES_ACCESS",
+    "TEST_CASES_UNITS1",
+    "TEST_CASES_UNITS2",
+    "TEST_CASES_ZONING",
+    "TEST_CASES_DATE1",
+    "TEST_CASES_DATE2",
+    "TEST_CASES_PRICE",
+    "TEST_CASES_PRICE_BAND",
+    "TEST_CASES_MANAGEMENT_FEE",
+    "TEST_CASES_MANAGEMENT_PREP_FEE",
+    "TEST_CASES_REPAIR_FUND",
+    "TEST_CASES_REPAIR_FUND_BASIC",
+    "TEST_CASES_OTHER_EXPENSES",
+    "TEST_CASES_LAYOUT",
+    "TEST_CASES_AREAS",
+    "TEST_CASES_RESTRICTIONS",
+    "TEST_CASES_DATE_EXACT",
+    "TEST_CASES_PRICE_MISC",
+    "TEST_CASES_PRICE_BAND_EXTRA",
+    "TEST_CASES_PRICE_BAND2",
+    "TEST_CASES_REPAIR_FUND_BASIC2",
+    "TEST_CASES_OTHER_EXPENSES2",
+    "TEST_CASES_LAYOUT2",
+    "TEST_CASES_AREA",
+    "TEST_CASES_DATE_EXACT2",
+    "TEST_CASES_DELIVERY_DATE",
+    "TEST_CASES_FLOOR",
+    "TEST_CASES_DIRECTION",
+    "TEST_CASES_FEATURE_PICKUP",
+    "TEST_CASES_BUILDING_STRUCTURE2",
+    "TEST_CASES_REFORM",
+    "TEST_CASES_SURROUNDING_FACILITIES",
+    "TEST_CASES_PARKING",
+    "TEST_CASES_BUILDING_STRUCTURE",
+    "TEST_CASES_LAND_USE",
+    "TEST_CASES_FLOOR_PLAN",
+    "TEST_CASES_BUILDING_COVERAGE",
+    "TEST_MAPPING",
+]
+
+
 EXPECTED_KEY_PROCESSING = [
     {
         "key_name": "所在地",
         "expected_cleaned_name": "住所",
         "expected_function": clean_address_to_json,
-        "expected_base_type": "structured_address"
     },
     {
         "key_name": "交通",
         "expected_cleaned_name": "交通",
         "expected_function": clean_access_to_json,
-        "expected_base_type": "access_routes"
     },
     {
         "key_name": "総戸数",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "用途地域",
         "expected_cleaned_name": "用途地域",
         "expected_function": clean_zoning_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "敷地の権利形態",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "販売スケジュール",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "価格",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "会社情報",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "施工",
         "expected_cleaned_name": "施工会社",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "管理",
         "expected_cleaned_name": "管理会社",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "予定価格",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "不動産会社ガイド",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "販売スケジュール_第5期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第5期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第5期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第5期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第5期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第5期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第5期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第5期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第5期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第5期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第5期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第5期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第5期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第5期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第5期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第5期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第5期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "販売スケジュール_第4期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第4期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第4期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第4期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "価格_第4期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第4期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第4期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第4期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第4期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第4期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第4期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第4期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第4期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第4期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "所在階_第4期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第4期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "制限事項_第4期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第4期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第4期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "所在階",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "販売スケジュール_第2期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第2期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第2期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第2期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格_第2期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第2期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第2期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第2期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第2期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第2期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第2期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第2期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第2期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第2期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第2期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第2期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第2期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "販売スケジュール_第1期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第1期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第1期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第1期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "価格_第1期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第1期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第1期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第1期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第1期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第1期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第1期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第1期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第1期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第1期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第1期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第1期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第1期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "所在階_第1期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第1期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "価格_第2期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第2期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "特徴ピックアップ",
         "expected_cleaned_name": "特徴",
         "expected_function": clean_feature_pickup_to_json,
-        "expected_base_type": "structured_features"
     },
     {
         "key_name": "物件名",
         "expected_cleaned_name": "物件名",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "販売戸数",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "所在階/構造・階建",
         "expected_cleaned_name": "構造階建",
         "expected_function": clean_building_structure_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "完成時期（築年月）",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "住所",
         "expected_cleaned_name": "住所",
         "expected_function": clean_address_to_json,
-        "expected_base_type": "structured_address"
     },
     {
         "key_name": "関連リンク",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "お問い合せ先",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "周辺施設",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "イベント情報",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "諸費用",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "完成時期(築年月)",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "リフォーム",
         "expected_cleaned_name": "リフォーム",
         "expected_function": clean_reform_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "その他制限事項",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他概要・特記事項",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "構造・階建て",
         "expected_cleaned_name": "構造階建",
         "expected_function": clean_building_structure_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "敷地面積",
         "expected_cleaned_name": "土地面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "駐車場",
         "expected_cleaned_name": "駐車場",
         "expected_function": clean_parking_to_json,
-        "expected_base_type": "parking_info"
     },
     {
         "key_name": "会社概要",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "問い合わせ先",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "施工\n",
         "expected_cleaned_name": "施工会社",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "情報提供日",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "次回更新日",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "担当者より",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "周辺環境",
         "expected_cleaned_name": "周辺施設",
         "expected_function": clean_surrounding_facilities_to_json,
-        "expected_base_type": "structured_features"
     },
     {
         "key_name": "プレゼント情報",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "販売スケジュール_第3期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第3期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第3期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第3期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第3期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第3期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第3期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第3期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第3期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第3期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第3期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第3期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第3期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第3期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第3期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第3期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第3期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格_第1期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第1期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "見学可能な日程",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "物件の特徴",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "土地面積",
         "expected_cleaned_name": "土地面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "建物面積",
         "expected_cleaned_name": "建物面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "私道負担・道路",
         "expected_cleaned_name": None, # データの意味が正しく理解できていないので保留
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "建ぺい率・容積率",
         "expected_cleaned_name": "建ぺい率容積率",
         "expected_function": clean_building_coverage_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "土地の権利形態",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "構造・工法",
         "expected_cleaned_name": "構造階建",
         "expected_function": clean_building_structure_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "地目",
         "expected_cleaned_name": "地目",
         "expected_function": clean_land_use_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "カーナビご利用の方",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "間取り図",
         "expected_cleaned_name": "間取り図",
         "expected_function": clean_floor_plan_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "建ぺい率･容積率",
         "expected_cleaned_name": "建ぺい率容積率",
         "expected_function": clean_building_coverage_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "販売区画数",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "総区画数",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "土地状況",
         "expected_cleaned_name": "土地状況",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "造成完了時期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "建築条件",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "引き渡し時期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第1期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定価格_第3期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定価格帯_第4期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第4期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "価格_第3期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第3期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定価格_第5期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定価格帯_第2期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "所在階_第2期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第2期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "販売スケジュール_第7期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第7期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第7期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第7期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第7期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第7期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第7期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第7期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第7期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第7期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第7期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第7期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第7期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第7期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第7期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第7期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第7期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格_第4期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "価格_第5期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第5期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "販売スケジュール_第6期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第6期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第6期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第6期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "価格_第6期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第6期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第6期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第6期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第6期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第6期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第6期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第6期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第6期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第6期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第6期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第6期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第6期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "所在階_第3期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第3期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "所在階_第5期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第5期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "価格_第7期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第7期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "所在階_第7期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第7期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "所在階_第6期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第6期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "予定価格_第6期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第6期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "お知らせ／その他",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "販売スケジュール_第8期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第8期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第8期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第8期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第8期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第8期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第8期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第8期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第8期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第8期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第8期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第8期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第8期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第8期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第8期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第8期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第8期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第6期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定価格_第7期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "価格_第8期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第8期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "所在階_第8期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第8期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     },
     {
         "key_name": "販売スケジュール_第9期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第9期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第9期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第9期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "価格_第9期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第9期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第9期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第9期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第9期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第9期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第9期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第9期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第9期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第9期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第9期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第9期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第9期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第9期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第9期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "価格 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "間取り ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "販売戸数 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "総戸数 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "土地面積 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "建物面積 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "私道負担・道路 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期（築年月） ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "最多価格帯 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "諸費用 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "建ぺい率・容積率 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期(築年月) ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "引渡可能時期 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "土地の権利形態 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "構造・工法 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "施工 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "リフォーム ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "用途地域 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "地目 ヒント",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "販売スケジュール_第10期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第10期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第10期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第10期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格帯_第10期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第10期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第10期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第10期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第10期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第10期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第10期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第10期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第10期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第10期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第10期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第10期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第10期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格_第8期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "エネルギー消費性能",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "断熱性能",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "目安光熱費",
         "expected_cleaned_name": "目安光熱費",
         "expected_function": clean_utility_cost_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定価格_第9期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定価格_第10期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "価格_第10期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第10期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "販売スケジュール_第11期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "完成時期_第11期",
         "expected_cleaned_name": "築年月",
         "expected_function": clean_date_to_json,
-        "expected_base_type": "date_or_period"
     },
     {
         "key_name": "引渡可能時期_第11期",
         "expected_cleaned_name": "引渡時期",
         "expected_function": clean_delivery_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "今回販売戸数_第11期",
         "expected_cleaned_name": "戸数",
         "expected_function": clean_units_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "予定価格_第11期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "予定最多価格帯_第11期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理費_第11期",
         "expected_cleaned_name": "管理費",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "管理準備金_第11期",
         "expected_cleaned_name": "管理準備金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立金_第11期",
         "expected_cleaned_name": "修繕積立金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "修繕積立基金_第11期",
         "expected_cleaned_name": "修繕積立基金",
         "expected_function": clean_management_fee_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他諸経費_第11期",
         "expected_cleaned_name": "他経費",
         "expected_function": clean_other_expenses_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "間取り_第11期",
         "expected_cleaned_name": "間取り",
         "expected_function": clean_layout_to_json,
-        "expected_base_type": "structured_layout"
     },
     {
         "key_name": "専有面積_第11期",
         "expected_cleaned_name": "専有面積",
         "expected_function": clean_area_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "その他面積_第11期",
         "expected_cleaned_name": "その他面積",
         "expected_function": clean_multiple_area_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "制限事項_第11期",
         "expected_cleaned_name": "制限事項",
         "expected_function": clean_restrictions_to_json,
-        "expected_base_type": "array"
     },
     {
         "key_name": "その他_第11期",
         "expected_cleaned_name": None,
         "expected_function": clean_force_null_to_json,
-        "expected_base_type": "null"
     },
     {
         "key_name": "取引条件有効期限_第11期",
         "expected_cleaned_name": "取引条件有効期限",
         "expected_function": clean_expiry_date_to_json,
-        "expected_base_type": "single"
     },
     {
         "key_name": "価格_第11期",
         "expected_cleaned_name": "価格",
         "expected_function": clean_price_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "最多価格帯_第11期",
         "expected_cleaned_name": "価格帯",
         "expected_function": clean_price_band_to_json,
-        "expected_base_type": "range_or_single"
     },
     {
         "key_name": "所在階_第9期",
         "expected_cleaned_name": "所在階",
         "expected_function": clean_number_to_json,
-        "expected_base_type": "number_with_unit"
     },
     {
         "key_name": "向き_第9期",
         "expected_cleaned_name": "向き",
         "expected_function": clean_text_to_json,
-        "expected_base_type": "structured_text"
     }
 ]
+
+EXPECTED_SCHEMAS = {
+    "住所": {
+        "base_type": "structured_address",
+        "required_fields": ["raw"],
+        "optional_fields": ["prefecture", "secondary_division", "secondary_type", "tertiary_division", "tertiary_type", "remaining", "hierarchy", "division_types"],
+        "field_types": {
+            "raw": str,
+            "prefecture": [str, type(None)],
+            "secondary_division": [str, type(None)],
+            "secondary_type": [str, type(None)],
+            "tertiary_division": [str, type(None)],
+            "tertiary_type": [str, type(None)],
+            "remaining": [str, type(None)],
+            "hierarchy": [str, type(None)],
+            "division_types": [str, type(None)]
+        }
+    },
+    "交通": {
+        "base_type": "access_routes",
+        "required_fields": [],
+        "optional_fields": ["routes", "value"],
+        "field_types": {
+            "routes": list,
+            "value": [str, type(None)]
+        }
+    },
+    "戸数": {
+        "base_type": "single",
+        "required_fields": [],
+        "optional_fields": ["value", "unit", "note", "is_total", "is_current_sale"],
+        "field_types": {
+            "value": [int, type(None)],
+            "unit": [str, type(None)],
+            "note": [str, type(None)],
+            "is_total": bool,
+            "is_current_sale": bool
+        }
+    },
+    "用途地域": {
+        "base_type": "array",
+        "required_fields": [],
+        "optional_fields": ["values"],
+        "field_types": {
+            "values": list
+        }
+    },
+    "築年月": {
+        "base_type": "date_or_period",
+        "required_fields": [],
+        "optional_fields": ["value", "year", "month", "day", "is_scheduled", "note", "period_text", "estimated_date", "tentative", "completed", "immediate", "is_undefined"],
+        "field_types": {
+            "value": [str, type(None)],
+            "year": [int, type(None)],
+            "month": [int, type(None)],
+            "day": [int, type(None)],
+            "is_scheduled": bool,
+            "note": [str, type(None)],
+            "period_text": [str, type(None)],
+            "estimated_date": [str, type(None)],
+            "tentative": bool,
+            "completed": bool,
+            "immediate": bool,
+            "is_undefined": bool
+        }
+    },
+    "引渡時期": {
+        "base_type": "single",
+        "required_fields": [],
+        "optional_fields": ["value", "type", "year", "month", "day", "is_planned", "estimated_date", "period_text", "months", "note"],
+        "field_types": {
+            "value": [str, type(None)],
+            "type": [str, type(None)],
+            "year": [int, type(None)],
+            "month": [int, type(None)],
+            "day": [int, type(None)],
+            "is_planned": bool,
+            "estimated_date": [str, type(None)],
+            "period_text": [str, type(None)],
+            "months": [float, type(None)],
+            "note": [str, type(None)]
+        }
+    },
+    "価格": {
+        "base_type": "range_or_single",
+        "required_fields": [],
+        "optional_fields": ["value", "min", "max", "unit", "is_undefined", "type", "note", "tentative"],
+        "field_types": {
+            "value": [float, int, type(None)],
+            "min": [float, int, type(None)],
+            "max": [float, int, type(None)],
+            "unit": [str, type(None)],
+            "is_undefined": bool,
+            "type": [str, type(None)],
+            "note": [str, type(None)],
+            "tentative": bool
+        }
+    },
+    "価格帯": {
+        "base_type": "range_or_single",
+        "required_fields": [],
+        "optional_fields": ["value", "min", "max", "unit", "is_undefined", "type", "note", "tentative", "values"],
+        "field_types": {
+            "value": [float, int, type(None)],
+            "min": [float, int, type(None)],
+            "max": [float, int, type(None)],
+            "unit": [str, type(None)],
+            "is_undefined": bool,
+            "type": [str, type(None)],
+            "note": [str, type(None)],
+            "tentative": bool,
+            "values": list
+        }
+    },
+    "管理費": {
+        "base_type": "range_or_single",
+        "required_fields": [],
+        "optional_fields": ["value", "min", "max", "unit", "is_undefined", "type", "note", "tentative", "management_type", "work_style", "frequency", "breakdown"],
+        "field_types": {
+            "value": [float, int, type(None)],
+            "min": [float, int, type(None)],
+            "max": [float, int, type(None)],
+            "unit": [str, type(None)],
+            "is_undefined": bool,
+            "type": [str, type(None)],
+            "note": [str, type(None)],
+            "tentative": bool,
+            "management_type": [str, type(None)],
+            "work_style": [str, type(None)],
+            "frequency": [str, type(None)],
+            "breakdown": [str, type(None)]
+        }
+    },
+    "他経費": {
+        "base_type": "array",
+        "required_fields": [],
+        "optional_fields": ["value", "expenses"],
+        "field_types": {
+            "value": [str, type(None)],
+            "expenses": list
+        }
+    },
+    "間取り": {
+        "base_type": "structured_layout",
+        "required_fields": [],
+        "optional_fields": ["types", "rooms", "main_rooms", "other_rooms", "type_summary", "value", "values"],
+        "field_types": {
+            "types": list,
+            "rooms": [int, type(None)],
+            "main_rooms": [int, type(None)],
+            "other_rooms": list,
+            "type_summary": [str, type(None)],
+            "value": [str, type(None)],
+            "values": list
+        }
+    },
+    "専有面積": {
+        "base_type": "range_or_single",
+        "required_fields": [],
+        "optional_fields": ["value", "min", "max", "unit", "min_tsubo", "max_tsubo"],
+        "field_types": {
+            "value": [float, int, type(None)],
+            "min": [float, int, type(None)],
+            "max": [float, int, type(None)],
+            "unit": [str, type(None)],
+            "min_tsubo": [float, int, type(None)],
+            "max_tsubo": [float, int, type(None)]
+        }
+    },
+    "その他面積": {
+        "base_type": "array",
+        "required_fields": [],
+        "optional_fields": ["areas"],
+        "field_types": {
+            "areas": list
+        }
+    },
+    "制限事項": {
+        "base_type": "array",
+        "required_fields": [],
+        "optional_fields": ["restrictions"],
+        "field_types": {
+            "restrictions": list
+        }
+    },
+    "取引条件有効期限": {
+        "base_type": "single",
+        "required_fields": [],
+        "optional_fields": ["value", "date"],
+        "field_types": {
+            "value": [str, type(None)],
+            "date": [str, type(None)]
+        }
+    },
+    "施工会社": {
+        "base_type": "structured_text",
+        "required_fields": [],
+        "optional_fields": ["value"],
+        "field_types": {
+            "value": [str, type(None)]
+        }
+    },
+    "管理会社": {
+        "base_type": "structured_text",
+        "required_fields": [],
+        "optional_fields": ["value"],
+        "field_types": {
+            "value": [str, type(None)]
+        }
+    },
+    "所在階": {
+        "base_type": "number_with_unit",
+        "required_fields": [],
+        "optional_fields": ["value", "unit", "note"],
+        "field_types": {
+            "value": [float, int, type(None)],
+            "unit": [str, type(None)],
+            "note": [str, type(None)]
+        }
+    },
+    "向き": {
+        "base_type": "structured_text",
+        "required_fields": [],
+        "optional_fields": ["value"],
+        "field_types": {
+            "value": [str, type(None)]
+        }
+    },
+    "特徴": {
+        "base_type": "structured_features",
+        "required_fields": [],
+        "optional_fields": ["feature_tags", "feature_count"],
+        "field_types": {
+            "feature_tags": list,
+            "feature_count": int
+        }
+    },
+    "構造階建": {
+        "base_type": "single",
+        "required_fields": [],
+        "optional_fields": ["structure", "floors", "basement", "value", "total_floors", "basement_floors", "floor", "partial_structure", "note", "raw_value"],
+        "field_types": {
+            "structure": [str, type(None)],
+            "floors": [int, type(None)],
+            "basement": [int, type(None)],
+            "value": [str, type(None)],
+            "total_floors": [int, type(None)],
+            "basement_floors": [int, type(None)],
+            "floor": [int, type(None)],
+            "partial_structure": [str, type(None)],
+            "note": [str, type(None)],
+            "raw_value": [str, type(None)]
+        }
+    },
+    "リフォーム": {
+        "base_type": "single",
+        "required_fields": [],
+        "optional_fields": ["value", "details", "cost", "has_reform", "reform_info", "completion_date", "is_scheduled", "reform_areas", "note"],
+        "field_types": {
+            "value": [str, type(None)],
+            "details": list,
+            "cost": [int, float, type(None)],
+            "has_reform": bool,
+            "reform_info": dict,
+            "completion_date": [str, type(None)],
+            "is_scheduled": bool,
+            "reform_areas": dict,
+            "note": [str, type(None)]
+        }
+    },
+    "周辺施設": {
+        "base_type": "structured_features",
+        "required_fields": [],
+        "optional_fields": ["facilities"],
+        "field_types": {
+            "facilities": list
+        }
+    },
+    "駐車場": {
+        "base_type": "parking_info",
+        "required_fields": [],
+        "optional_fields": ["availability", "available", "count", "min", "max", "unit", "notes", "value", "location", "frequency", "note"],
+        "field_types": {
+            "availability": bool,
+            "available": bool,
+            "count": [int, type(None)],
+            "min": [int, float, type(None)],
+            "max": [int, float, type(None)],
+            "unit": [str, type(None)],
+            "notes": [str, type(None)],
+            "value": [str, int, float, type(None)],
+            "location": [str, type(None)],
+            "frequency": [str, type(None)],
+            "note": [str, type(None)]
+        }
+    },
+    "地目": {
+        "base_type": "structured_text",
+        "required_fields": [],
+        "optional_fields": ["value", "values", "note"],
+        "field_types": {
+            "value": [str, type(None)],
+            "values": list,
+            "note": [str, type(None)]
+        }
+    },
+    "間取り図": {
+        "base_type": "structured_text",
+        "required_fields": [],
+        "optional_fields": ["value", "building_number", "price", "layout", "land_area", "building_area"],
+        "field_types": {
+            "value": [str, type(None)],
+            "building_number": [str, type(None)],
+            "price": dict,
+            "layout": [str, type(None)],
+            "land_area": dict,
+            "building_area": dict
+        }
+    },
+    "建ぺい率容積率": {
+        "base_type": "structured_text",
+        "required_fields": [],
+        "optional_fields": ["building_coverage_ratio", "floor_area_ratio", "value", "building_coverage", "unit"],
+        "field_types": {
+            "building_coverage_ratio": [int, float, type(None)],
+            "floor_area_ratio": [int, float, type(None)],
+            "value": [str, type(None)],
+            "building_coverage": [int, float, type(None)],
+            "unit": [str, type(None)]
+        }
+    }
+}
 
 TEST_CASES_ADDRESS = [
     {"input": "東京都中央区晴海５", "expected": {"raw": "東京都中央区晴海５", "prefecture": "東京都", "secondary_division": "中央区", "secondary_type": "特別区", "tertiary_division": None, "tertiary_type": None, "remaining": "晴海５", "hierarchy": "東京都 -> 中央区", "division_types": "特別区"}},
@@ -2090,16 +2132,16 @@ TEST_CASES_ZONING = [
 ]
 
 TEST_CASES_DATE1 = [
-    {"input": "2026年2月下旬予定", "expected": {"year": 2026, "month": 2, "period_text": "下旬", "estimated_date": "2026-02-25", "tentative": True, }},
-    {"input": "2024年2月竣工済",     "expected": {"year": 2024, "month": 2, "estimated_date": "2024-02-01", "completed": True,  }},
-    {"input": "2024年2月",         "expected": {"year": 2024, "month": 2, "estimated_date": "2024-02-01",               }},
-    {"input": "2023年11月竣工済み","expected": {"year": 2023, "month": 11, "estimated_date": "2023-11-01", "completed": True,  }},
-    {"input": "2024年3月完成済",   "expected": {"year": 2024, "month": 3, "estimated_date": "2024-03-01", "completed": True,  }},
-    {"input": "2027年2月下旬予定", "expected": {"year": 2027, "month": 2, "period_text": "下旬", "estimated_date": "2027-02-25", "tentative": True, }},
-    {"input": "即日",              "expected": {"immediate": True,             }},
-    {"input": "未定",              "expected": {"is_undefined": True,          }},
-    {"input": "2024年2月中旬",     "expected": {"year": 2024, "month": 2, "period_text": "中旬", "estimated_date": "2024-02-15",               }},
-    {"input": "2025年3月28日予定","expected": {"year": 2025, "month": 3, "day": 28, "estimated_date": "2025-03-28", "tentative": True, }},
+    {"input": "2026年2月下旬予定", "expected": {"year": 2026, "month": 2, "period_text": "下旬", "estimated_date": "2026-02-25", "tentative": True}},
+    {"input": "2024年2月竣工済",     "expected": {"year": 2024, "month": 2, "estimated_date": "2024-02-01", "completed": True}},
+    {"input": "2024年2月",         "expected": {"year": 2024, "month": 2, "estimated_date": "2024-02-01"}},
+    {"input": "2023年11月竣工済み","expected": {"year": 2023, "month": 11, "estimated_date": "2023-11-01", "completed": True}},
+    {"input": "2024年3月完成済",   "expected": {"year": 2024, "month": 3, "estimated_date": "2024-03-01", "completed": True}},
+    {"input": "2027年2月下旬予定", "expected": {"year": 2027, "month": 2, "period_text": "下旬", "estimated_date": "2027-02-25", "tentative": True}},
+    {"input": "即日",              "expected": {"immediate": True}},
+    {"input": "未定",              "expected": {"is_undefined": True}},
+    {"input": "2024年2月中旬",     "expected": {"year": 2024, "month": 2, "period_text": "中旬", "estimated_date": "2024-02-15"}},
+    {"input": "2025年3月28日予定","expected": {"year": 2025, "month": 3, "day": 28, "estimated_date": "2025-03-28", "tentative": True}},
 ]
 
 TEST_CASES_DATE2 = [
@@ -2116,29 +2158,29 @@ TEST_CASES_DATE2 = [
 ]
 
 TEST_CASES_PRICE = [
-    {"input": "2980万円   [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 2980.0, }},
-    {"input": "未定", "expected": {"value": None, "is_undefined": True, }},
-    {"input": "1680万円   (土地のみの価格です)    [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 1680.0, "note": "土地のみの価格です", }},
+    {"input": "2980万円   [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 2980.0}},
+    {"input": "未定", "expected": {"value": None, "is_undefined": True}},
+    {"input": "1680万円   (土地のみの価格です)    [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 1680.0, "note": "土地のみの価格です"}},
     {"input": "3980万円〜5980万円 [ □支払シミュレーション ]", "expected": {"unit": "万円", "min": 3980.0, "max": 5980.0, "value": 4980.0}},
-    {"input": "価格要相談 [ □支払シミュレーション ]", "expected": {"type": "negotiable", }},
+    {"input": "価格要相談 [ □支払シミュレーション ]", "expected": {"type": "negotiable"}},
     {"input": "2980万円（参考価格）       [ □支払シミュレーション ]", "expected": {'unit': '万円', 'value': 2980.0, 'note': '参考価格', 'tentative': True}},
-    {"input": "4350万円(モデルルーム住戸につき家具家電付き)       [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 4350.0, "note": "モデルルーム住戸につき家具家電付き", }},
-    {"input": "即入居可 2980万円  [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 2980.0, }},
-    {"input": "2700万円(建物価格: 1800万円 、土地価格: 900万円)   [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 2700.0, "note": "建物価格: 1800万円 、土地価格: 900万円", }},
+    {"input": "4350万円(モデルルーム住戸につき家具家電付き)       [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 4350.0, "note": "モデルルーム住戸につき家具家電付き"}},
+    {"input": "即入居可 2980万円  [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 2980.0}},
+    {"input": "2700万円(建物価格: 1800万円 、土地価格: 900万円)   [ □支払シミュレーション ]", "expected": {"unit": "万円", "value": 2700.0, "note": "建物価格: 1800万円 、土地価格: 900万円"}},
     {"input": "8980万円〜2億880万円       [ □支払シミュレーション ]", "expected": {"unit": "万円", "min": 8980.0, "max": 20880.0, "value": 14930.0}},
 ]
 
 TEST_CASES_PRICE_BAND = [
-    {"input": "-", "expected": {"value": None, }},
-    {"input": "2400万円台（2戸）", "expected": {"unit": "万円", "values": [{"price": 2400.0, "count": 2}], "value": 2400.0, }},
-    {"input": "2900万円台・3100万円台（各1戸）", "expected": {"unit": "万円", "values": [{"price": 2900.0, "count": 1}, {"price": 3100.0, "count": 1}], "value": 3000.0, }},
-    {"input": "2600万円台・2900万円台（各2戸）", "expected": {"unit": "万円", "values": [{"price": 2600.0, "count": 2}, {"price": 2900.0, "count": 2}], "value": 2750.0, }},
-    {"input": "3800万円台・3900万円台（各3戸）", "expected": {"unit": "万円", "values": [{"price": 3800.0, "count": 3}, {"price": 3900.0, "count": 3}], "value": 3850.0, }},
-    {"input": "4600万円台・4700万円台（各2戸）", "expected": {"unit": "万円", "values": [{"price": 4600.0, "count": 2}, {"price": 4700.0, "count": 2}], "value": 4650.0, }},
-    {"input": "3700万円台・3800万円台・3900万円台（各1戸）", "expected": {"unit": "万円", "values": [{"price": 3700.0, "count": 1}, {"price": 3800.0, "count": 1}, {"price": 3900.0, "count": 1}], "value": 3800.0, }},
-    {"input": "1億円台（4戸）", "expected": {"unit": "万円", "values": [{"price": 10000.0, "count": 4}], "value": 10000.0, }},
-    {"input": "2600万円台・2700万円台・2800万円台・2900万円台（各1戸）", "expected": {"unit": "万円", "values": [{"price": 2600.0, "count": 1}, {"price": 2700.0, "count": 1}, {"price": 2800.0, "count": 1}, {"price": 2900.0, "count": 1}], "value": 2750.0, }},
-    {"input": "7300万円台（2戸）", "expected": {"unit": "万円", "values": [{"price": 7300.0, "count": 2}], "value": 7300.0, }}
+    {"input": "-", "expected": {"value": None}},
+    {"input": "2400万円台（2戸）", "expected": {"unit": "万円", "values": [{"price": 2400.0, "count": 2}], "value": 2400.0}},
+    {"input": "2900万円台・3100万円台（各1戸）", "expected": {"unit": "万円", "values": [{"price": 2900.0, "count": 1}, {"price": 3100.0, "count": 1}], "value": 3000.0}},
+    {"input": "2600万円台・2900万円台（各2戸）", "expected": {"unit": "万円", "values": [{"price": 2600.0, "count": 2}, {"price": 2900.0, "count": 2}], "value": 2750.0}},
+    {"input": "3800万円台・3900万円台（各3戸）", "expected": {"unit": "万円", "values": [{"price": 3800.0, "count": 3}, {"price": 3900.0, "count": 3}], "value": 3850.0}},
+    {"input": "4600万円台・4700万円台（各2戸）", "expected": {"unit": "万円", "values": [{"price": 4600.0, "count": 2}, {"price": 4700.0, "count": 2}], "value": 4650.0}},
+    {"input": "3700万円台・3800万円台・3900万円台（各1戸）", "expected": {"unit": "万円", "values": [{"price": 3700.0, "count": 1}, {"price": 3800.0, "count": 1}, {"price": 3900.0, "count": 1}], "value": 3800.0}},
+    {"input": "1億円台（4戸）", "expected": {"unit": "万円", "values": [{"price": 10000.0, "count": 4}], "value": 10000.0}},
+    {"input": "2600万円台・2700万円台・2800万円台・2900万円台（各1戸）", "expected": {"unit": "万円", "values": [{"price": 2600.0, "count": 1}, {"price": 2700.0, "count": 1}, {"price": 2800.0, "count": 1}, {"price": 2900.0, "count": 1}], "value": 2750.0}},
+    {"input": "7300万円台（2戸）", "expected": {"unit": "万円", "values": [{"price": 7300.0, "count": 2}], "value": 7300.0}}
 ]
 
 TEST_CASES_MANAGEMENT_FEE = [
@@ -2233,26 +2275,26 @@ TEST_CASES_LAYOUT = [
 
 TEST_CASES_AREAS = [
     {"input": "-", "expected": {"areas": []}},
-    {"input": "バルコニー面積：9.45m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 9.45, "unit": "m^2", "tsubo": 2.86}]}},
-    {"input": "バルコニー面積：1m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 1.0, "unit": "m^2", "tsubo": 0.3}]}},
-    {"input": "バルコニー面積：28.07m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 28.07, "unit": "m^2", "tsubo": 8.49}]}},
-    {"input": "テラス面積：15.4m2", "expected": {"areas": [{"type": "テラス面積", "value": 15.4, "unit": "m^2", "tsubo": 4.66}]}},
-    {"input": "ルーフバルコニー面積：25.83m2", "expected": {"areas": [{"type": "ルーフバルコニー面積", "value": 25.83, "unit": "m^2", "tsubo": 7.81}]}},
-    {"input": "専用庭面積：45.6m2", "expected": {"areas": [{"type": "専用庭面積", "value": 45.6, "unit": "m^2", "tsubo": 13.79}]}},
-    {"input": "サービスバルコニー面積：3.8m2", "expected": {"areas": [{"type": "サービスバルコニー面積", "value": 3.8, "unit": "m^2", "tsubo": 1.15}]}},
-    {"input": "バルコニー面積：6.75m2　テラス面積：12.5m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 6.75, "unit": "m^2", "tsubo": 2.04}, {"type": "テラス面積", "value": 12.5, "unit": "m^2", "tsubo": 3.78}]}},
-    {"input": "サービスバルコニー面積：3.8m2　バルコニー面積：8.4m2", "expected": {"areas": [{"type": "サービスバルコニー面積", "value": 3.8, "unit": "m^2", "tsubo": 1.15}, {"type": "バルコニー面積", "value": 8.4, "unit": "m^2", "tsubo": 2.54}]}},
-    {"input": "専用使用料対象面積：18.7m2（2000円／月）", "expected": {"areas": [{"type": "専用使用料対象面積", "value": 18.7, "unit": "m^2", "tsubo": 5.66, "monthly_fee": 2000}]}},
-    {"input": "トランクルーム面積：2.4m2（利用料：月額1500円）", "expected": {"areas": [{"type": "トランクルーム面積", "value": 2.4, "unit": "m^2", "tsubo": 0.73, "monthly_fee": 1500}]}},
-    {"input": "アルコーブ面積：4.2m2", "expected": {"areas": [{"type": "アルコーブ面積", "value": 4.2, "unit": "m^2", "tsubo": 1.27}]}},
-    {"input": "ウォークインクローゼット面積：6.8m2", "expected": {"areas": [{"type": "ウォークインクローゼット面積", "value": 6.8, "unit": "m^2", "tsubo": 2.06}]}},
-    {"input": "共用庭利用権面積：35.2m2（共用）", "expected": {"areas": [{"type": "共用庭利用権面積", "value": 35.2, "unit": "m^2", "tsubo": 10.65, "measurement_type": "共用"}]}},
-    {"input": "バルコニー面積：7.2m2　サービスバルコニー面積：2.8m2　テラス面積：9.6m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 7.2, "unit": "m^2", "tsubo": 2.18}, {"type": "サービスバルコニー面積", "value": 2.8, "unit": "m^2", "tsubo": 0.85}, {"type": "テラス面積", "value": 9.6, "unit": "m^2", "tsubo": 2.9}]}},
-    {"input": "ルーフテラス面積：42.3m2（使用料：月額3000円）", "expected": {"areas": [{"type": "ルーフテラス面積", "value": 42.3, "unit": "m^2", "tsubo": 12.8, "monthly_fee": 3000}]}},
-    {"input": "専用ポーチ面積：8.9m2", "expected": {"areas": [{"type": "専用ポーチ面積", "value": 8.9, "unit": "m^2", "tsubo": 2.69}]}},
-    {"input": "納戸面積：5.6m2　ウォークインクローゼット面積：4.3m2", "expected": {"areas": [{"type": "納戸面積", "value": 5.6, "unit": "m^2", "tsubo": 1.69}, {"type": "ウォークインクローゼット面積", "value": 4.3, "unit": "m^2", "tsubo": 1.3}]}},
-    {"input": "スタディコーナー面積：3.1m2", "expected": {"areas": [{"type": "スタディコーナー面積", "value": 3.1, "unit": "m^2", "tsubo": 0.94}]}},
-    {"input": "バルコニー面積：6.1m2～6.6m2、テラス：6.3m2～6.6m2（使用料未定）、ガーデンテラス面積：5.6m2～6.6m2（使用料未定）", "expected": {"areas":[{"type":"バルコニー面積","value":6.1,"unit":"m^2","tsubo":1.85},{"type":"テラス","value":6.3,"unit":"m^2","tsubo":1.91},{"type":"ガーデンテラス面積","value":5.6,"unit":"m^2","tsubo":1.69,}]}}
+    {"input": "バルコニー面積：9.45m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 9.45, "unit": "m^2"}]}},
+    {"input": "バルコニー面積：1m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 1.0, "unit": "m^2"}]}},
+    {"input": "バルコニー面積：28.07m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 28.07, "unit": "m^2"}]}},
+    {"input": "テラス面積：15.4m2", "expected": {"areas": [{"type": "テラス面積", "value": 15.4, "unit": "m^2"}]}},
+    {"input": "ルーフバルコニー面積：25.83m2", "expected": {"areas": [{"type": "ルーフバルコニー面積", "value": 25.83, "unit": "m^2"}]}},
+    {"input": "専用庭面積：45.6m2", "expected": {"areas": [{"type": "専用庭面積", "value": 45.6, "unit": "m^2"}]}},
+    {"input": "サービスバルコニー面積：3.8m2", "expected": {"areas": [{"type": "サービスバルコニー面積", "value": 3.8, "unit": "m^2"}]}},
+    {"input": "バルコニー面積：6.75m2　テラス面積：12.5m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 6.75, "unit": "m^2"}, {"type": "テラス面積", "value": 12.5, "unit": "m^2"}]}},
+    {"input": "サービスバルコニー面積：3.8m2　バルコニー面積：8.4m2", "expected": {"areas": [{"type": "サービスバルコニー面積", "value": 3.8, "unit": "m^2"}, {"type": "バルコニー面積", "value": 8.4, "unit": "m^2"}]}},
+    {"input": "専用使用料対象面積：18.7m2（2000円／月）", "expected": {"areas": [{"type": "専用使用料対象面積", "value": 18.7, "unit": "m^2", "monthly_fee": 2000}]}},
+    {"input": "トランクルーム面積：2.4m2（利用料：月額1500円）", "expected": {"areas": [{"type": "トランクルーム面積", "value": 2.4, "unit": "m^2", "monthly_fee": 1500}]}},
+    {"input": "アルコーブ面積：4.2m2", "expected": {"areas": [{"type": "アルコーブ面積", "value": 4.2, "unit": "m^2"}]}},
+    {"input": "ウォークインクローゼット面積：6.8m2", "expected": {"areas": [{"type": "ウォークインクローゼット面積", "value": 6.8, "unit": "m^2"}]}},
+    {"input": "共用庭利用権面積：35.2m2（共用）", "expected": {"areas": [{"type": "共用庭利用権面積", "value": 35.2, "unit": "m^2", "measurement_type": "共用"}]}},
+    {"input": "バルコニー面積：7.2m2　サービスバルコニー面積：2.8m2　テラス面積：9.6m2", "expected": {"areas": [{"type": "バルコニー面積", "value": 7.2, "unit": "m^2"}, {"type": "サービスバルコニー面積", "value": 2.8, "unit": "m^2"}, {"type": "テラス面積", "value": 9.6, "unit": "m^2"}]}},
+    {"input": "ルーフテラス面積：42.3m2（使用料：月額3000円）", "expected": {"areas": [{"type": "ルーフテラス面積", "value": 42.3, "unit": "m^2", "monthly_fee": 3000}]}},
+    {"input": "専用ポーチ面積：8.9m2", "expected": {"areas": [{"type": "専用ポーチ面積", "value": 8.9, "unit": "m^2"}]}},
+    {"input": "納戸面積：5.6m2　ウォークインクローゼット面積：4.3m2", "expected": {"areas": [{"type": "納戸面積", "value": 5.6, "unit": "m^2"}, {"type": "ウォークインクローゼット面積", "value": 4.3, "unit": "m^2"}]}},
+    {"input": "スタディコーナー面積：3.1m2", "expected": {"areas": [{"type": "スタディコーナー面積", "value": 3.1, "unit": "m^2"}]}},
+    {"input": "バルコニー面積：6.1m2～6.6m2、テラス：6.3m2～6.6m2（使用料未定）、ガーデンテラス面積：5.6m2～6.6m2（使用料未定）", "expected": {"areas":[{"type":"バルコニー面積","value":6.1,"unit":"m^2",},{"type":"テラス","value":6.3,"unit":"m^2",},{"type":"ガーデンテラス面積","value":5.6,"unit":"m^2"}]}}
 ]
 
 TEST_CASES_RESTRICTIONS = [
@@ -2308,120 +2350,120 @@ TEST_CASES_PRICE_BAND_EXTRA = [
 ]
 
 TEST_CASES_PRICE_BAND2 = [
-    {"input": "2700万円台～4400万円台", "expected": {"unit": "万円", "values": [{"price": 2700.0, "count": None}, {"price": 4400.0, "count": None}], "value": 3550.0, }},
-    {"input": "3700万円台～8400万円台", "expected": {"unit": "万円", "values": [{"price": 3700.0, "count": None}, {"price": 8400.0, "count": None}], "value": 6050.0, }},
-    {"input": "2900万円台・3200万円台", "expected": {"unit": "万円", "values": [{"price": 2900.0, "count": None}, {"price": 3200.0, "count": None}], "value": 3050.0, }},
-    {"input": "3900万円台", "expected": {"unit": "万円", "values": [{"price": 3900.0, "count": 1}], "value": 3900.0, }},
-    {"input": "8300万円台・9500万円台", "expected": {"unit": "万円", "values": [{"price": 8300.0, "count": None}, {"price": 9500.0, "count": None}], "value": 8900.0, }},
-    {"input": "5800万円台～9900万円台", "expected": {"unit": "万円", "values": [{"price": 5800.0, "count": None}, {"price": 9900.0, "count": None}], "value": 7850.0, }},
-    {"input": "2400万円台～6300万円台", "expected": {"unit": "万円", "values": [{"price": 2400.0, "count": None}, {"price": 6300.0, "count": None}], "value": 4350.0, }},
-    {"input": "2900万円台～4500万円台（うちモデルルーム価格4476万円、予定）", "expected": {"unit": "万円", "values": [{"price": 2900.0, "count": None}, {"price": 4500.0, "count": None}], "value": 3700.0, }},
-    {"input": "3900万円台～8300万円台（※100万円単位）", "expected": {"unit": "万円", "values": [{"price": 3900.0, "count": None}, {"price": 8300.0, "count": None}], "value": 6100.0, }},
-    {"input": "8900万円台～1億2900万円台", "expected": {"unit": "万円", "values": [{"price": 8900.0, "count": None}, {"price": 12900.0, "count": None}], "value": 10900, }},
+    {"input": "2700万円台～4400万円台", "expected": {"unit": "万円", "values": [{"price": 2700.0, "count": None}, {"price": 4400.0, "count": None}], "value": 3550.0}},
+    {"input": "3700万円台～8400万円台", "expected": {"unit": "万円", "values": [{"price": 3700.0, "count": None}, {"price": 8400.0, "count": None}], "value": 6050.0}},
+    {"input": "2900万円台・3200万円台", "expected": {"unit": "万円", "values": [{"price": 2900.0, "count": None}, {"price": 3200.0, "count": None}], "value": 3050.0}},
+    {"input": "3900万円台", "expected": {"unit": "万円", "values": [{"price": 3900.0, "count": 1}], "value": 3900.0}},
+    {"input": "8300万円台・9500万円台", "expected": {"unit": "万円", "values": [{"price": 8300.0, "count": None}, {"price": 9500.0, "count": None}], "value": 8900.0}},
+    {"input": "5800万円台～9900万円台", "expected": {"unit": "万円", "values": [{"price": 5800.0, "count": None}, {"price": 9900.0, "count": None}], "value": 7850.0}},
+    {"input": "2400万円台～6300万円台", "expected": {"unit": "万円", "values": [{"price": 2400.0, "count": None}, {"price": 6300.0, "count": None}], "value": 4350.0}},
+    {"input": "2900万円台～4500万円台（うちモデルルーム価格4476万円、予定）", "expected": {"unit": "万円", "values": [{"price": 2900.0, "count": None}, {"price": 4500.0, "count": None}], "value": 3700.0}},
+    {"input": "3900万円台～8300万円台（※100万円単位）", "expected": {"unit": "万円", "values": [{"price": 3900.0, "count": None}, {"price": 8300.0, "count": None}], "value": 6100.0}},
+    {"input": "8900万円台～1億2900万円台", "expected": {"unit": "万円", "values": [{"price": 8900.0, "count": None}, {"price": 12900.0, "count": None}], "value": 10900}},
 ]
 
 TEST_CASES_REPAIR_FUND_BASIC2 = [
-    {"input": "金額未定", "expected": {"is_undefined": True, "value": None, }},
-    {"input": "106万5000円～132万3000円（一括払い）", "expected": {"min": 1065000, "max": 1323000, "value": 1194000.0, "unit": "円", "frequency": "一括", }},
+    {"input": "金額未定", "expected": {"is_undefined": True, "value": None}},
+    {"input": "106万5000円～132万3000円（一括払い）", "expected": {"min": 1065000, "max": 1323000, "value": 1194000.0, "unit": "円", "frequency": "一括"}},
     {"input": "23万100円～33万6600円（一括払い）、修繕積立基金(住宅)：16万4400円～24万400円（一括払い）", "expected": {"min": 230100, "max": 336600, "value": 283350.0, "unit": "円", "frequency": "一括", "note": "修繕積立基金(住宅)：16万4400円～24万400円（一括払い）"}},
-    {"input": "57万5400円・60万3000円（一括払い）", "expected": {"min": 575400, "max": 603000, "value": 589200.0, "unit": "円", "frequency": "一括", }},
+    {"input": "57万5400円・60万3000円（一括払い）", "expected": {"min": 575400, "max": 603000, "value": 589200.0, "unit": "円", "frequency": "一括"}},
     {"input": "75万5000円（一括払い）、全体修繕積立基金：80万6000円（一括払い）", "expected": {"value": 755000, "unit": "円", "frequency": "一括", "note": "全体修繕積立基金：80万6000円（一括払い）"}},
-    {"input": "36万600円～207万7800円（一括払い）", "expected": {"min": 360600, "max": 2077800, "value": 1219200.0, "unit": "円", "frequency": "一括", }},
-    {"input": "78万9840円・81万690円（一括払い）", "expected": {"min": 789840, "max": 810690, "value": 800265.0, "unit": "円", "frequency": "一括", }},
-    {"input": "24万6000円～113万8500円（一括払い）", "expected": {"min": 246000, "max": 1138500, "value": 692250.0, "unit": "円", "frequency": "一括", }},
+    {"input": "36万600円～207万7800円（一括払い）", "expected": {"min": 360600, "max": 2077800, "value": 1219200.0, "unit": "円", "frequency": "一括"}},
+    {"input": "78万9840円・81万690円（一括払い）", "expected": {"min": 789840, "max": 810690, "value": 800265.0, "unit": "円", "frequency": "一括"}},
+    {"input": "24万6000円～113万8500円（一括払い）", "expected": {"min": 246000, "max": 1138500, "value": 692250.0, "unit": "円", "frequency": "一括"}},
     {"input": "金額未定、金額未定 （団地修繕積立一時金）", "expected": {"is_undefined": True, "value": None, "note": "金額未定 （団地修繕積立一時金）"}},
     {"input": "75万5000円・87万6000円（一括払い）、全体修繕積立基金：80万6000円・93万5000円（一括払い）", "expected": {"min": 755000, "max": 876000, "value": 815500.0, "unit": "円", "frequency": "一括", "note": "全体修繕積立基金：80万6000円・93万5000円（一括払い）"}},
 ]
 
 TEST_CASES_OTHER_EXPENSES2 = [
-    {"input": "-", "expected": {"value": None, }},
-    {"input": "災害積立金：300円／月、災害積立基金：1万円／一括", "expected": {"expenses": [{"name": "災害積立金", "category": "災害積立", "value": 300, "unit": "円", "frequency": "月"}, {"name": "災害積立基金", "category": "災害積立", "value": 10000, "unit": "円", "frequency": "一括"}], }},
-    {"input": "インターネット接続サービス利用料：1375円／月、ロイヤルサロン使用料：650円～2110円／月", "expected": {"expenses": [{"name": "インターネット", "category": "通信費", "value": 1375, "unit": "円", "frequency": "月"}, {"name": "ロイヤルサロン使用料", "category": "利用料", "min": 650, "max": 2110, "value": 1380.0, "unit": "円", "frequency": "月"}], }},
-    {"input": "インターネット定額料金：990円／月、給湯器リース料：2200円／月、CATV利用料金：385円／月", "expected": {"expenses": [{"name": "インターネット", "category": "通信費", "value": 990, "unit": "円", "frequency": "月"}, {"name": "CATV", "category": "通信費", "value": 385, "unit": "円", "frequency": "月"}], }},
-    {"input": "管理一時金：1万6700円・2万2360円／一括、専用利用料：3080円／月(ホームセキュリティ費用、インターネットサービス利用料、プロバイダサービス料、マンションポータルサイト利用料含む)、コミュニティクラブ費：300円／月", "expected": {"expenses": [{"name": "管理一時金", "category": "管理費", "value": 16700, "unit": "円", "frequency": "月"}, {"name": "専用利用料", "category": "利用料", "value": 3080, "unit": "円", "frequency": "月"}, {"name": "コミュニティクラブ費", "category": "コミュニティ", "value": 300, "unit": "円", "frequency": "月"}], }},
-    {"input": "地代：6083円／月、地代準備金：14万5992円（一括払い）、町内会費：200円／月、インターネット定額料金：1925円／月", "expected": {"expenses": [{"name": "地代", "category": "地代", "value": 6083, "unit": "円", "frequency": "月"}, {"name": "町内会費", "category": "自治会費", "value": 200, "unit": "円", "frequency": "月"}, {"name": "インターネット", "category": "通信費", "value": 1925, "unit": "円", "frequency": "月"}], }},
-    {"input": "地代：6083円～7536円／月、地代準備金：14万5992円～18万864円（一括払い）", "expected": {"expenses": [{"name": "地代", "category": "地代", "min": 6083, "max": 7536, "value": 6809.5, "unit": "円", "frequency": "月"}], }},
-    {"input": "保証金：21万8400円～32万6400円、月払賃料：9100円～1万3600円／月、借地返還対応準備金：6090円～9130円／月、インターネット使用料：770円／月", "expected": {"expenses": [{"name": "保証金", "category": "保証金", "min": 218400, "max": 326400, "value": 272400.0, "unit": "円", "frequency": "月"}, {"name": "インターネット", "category": "通信費", "value": 770, "unit": "円", "frequency": "月"}], }},
-    {"input": "解体準備金：3300円／月、支払地代：1万614円／月、解体準備一時金：11万8800円／一括、地代保証金：25万4736円／一括、インターネット使用料：2189円／月", "expected": {"expenses": [{"name": "解体準備金", "category": "解体", "value": 3300, "unit": "円", "frequency": "月"}, {"name": "支払地代", "category": "地代", "value": 10614, "unit": "円", "frequency": "月"}, {"name": "解体準備一時金", "category": "解体", "value": 118800, "unit": "円", "frequency": "一括"}, {"name": "地代保証金", "category": "保証金", "value": 254736, "unit": "円", "frequency": "一括"}, {"name": "インターネット", "category": "通信費", "value": 2189, "unit": "円", "frequency": "月"}], }},
-    {"input": "インターネット使用料：金額未定", "expected": {"value": None, }},
+    {"input": "-", "expected": {"value": None}},
+    {"input": "災害積立金：300円／月、災害積立基金：1万円／一括", "expected": {"expenses": [{"name": "災害積立金", "category": "災害積立", "value": 300, "unit": "円", "frequency": "月"}, {"name": "災害積立基金", "category": "災害積立", "value": 10000, "unit": "円", "frequency": "一括"}]}},
+    {"input": "インターネット接続サービス利用料：1375円／月、ロイヤルサロン使用料：650円～2110円／月", "expected": {"expenses": [{"name": "インターネット", "category": "通信費", "value": 1375, "unit": "円", "frequency": "月"}, {"name": "ロイヤルサロン使用料", "category": "利用料", "min": 650, "max": 2110, "value": 1380.0, "unit": "円", "frequency": "月"}]}},
+    {"input": "インターネット定額料金：990円／月、給湯器リース料：2200円／月、CATV利用料金：385円／月", "expected": {"expenses": [{"name": "インターネット", "category": "通信費", "value": 990, "unit": "円", "frequency": "月"}, {"name": "CATV", "category": "通信費", "value": 385, "unit": "円", "frequency": "月"}]}},
+    {"input": "管理一時金：1万6700円・2万2360円／一括、専用利用料：3080円／月(ホームセキュリティ費用、インターネットサービス利用料、プロバイダサービス料、マンションポータルサイト利用料含む)、コミュニティクラブ費：300円／月", "expected": {"expenses": [{"name": "管理一時金", "category": "管理費", "value": 16700, "unit": "円", "frequency": "月"}, {"name": "専用利用料", "category": "利用料", "value": 3080, "unit": "円", "frequency": "月"}, {"name": "コミュニティクラブ費", "category": "コミュニティ", "value": 300, "unit": "円", "frequency": "月"}]}},
+    {"input": "地代：6083円／月、地代準備金：14万5992円（一括払い）、町内会費：200円／月、インターネット定額料金：1925円／月", "expected": {"expenses": [{"name": "地代", "category": "地代", "value": 6083, "unit": "円", "frequency": "月"}, {"name": "町内会費", "category": "自治会費", "value": 200, "unit": "円", "frequency": "月"}, {"name": "インターネット", "category": "通信費", "value": 1925, "unit": "円", "frequency": "月"}]}},
+    {"input": "地代：6083円～7536円／月、地代準備金：14万5992円～18万864円（一括払い）", "expected": {"expenses": [{"name": "地代", "category": "地代", "min": 6083, "max": 7536, "value": 6809.5, "unit": "円", "frequency": "月"}]}},
+    {"input": "保証金：21万8400円～32万6400円、月払賃料：9100円～1万3600円／月、借地返還対応準備金：6090円～9130円／月、インターネット使用料：770円／月", "expected": {"expenses": [{"name": "保証金", "category": "保証金", "min": 218400, "max": 326400, "value": 272400.0, "unit": "円", "frequency": "月"}, {"name": "インターネット", "category": "通信費", "value": 770, "unit": "円", "frequency": "月"}]}},
+    {"input": "解体準備金：3300円／月、支払地代：1万614円／月、解体準備一時金：11万8800円／一括、地代保証金：25万4736円／一括、インターネット使用料：2189円／月", "expected": {"expenses": [{"name": "解体準備金", "category": "解体", "value": 3300, "unit": "円", "frequency": "月"}, {"name": "支払地代", "category": "地代", "value": 10614, "unit": "円", "frequency": "月"}, {"name": "解体準備一時金", "category": "解体", "value": 118800, "unit": "円", "frequency": "一括"}, {"name": "地代保証金", "category": "保証金", "value": 254736, "unit": "円", "frequency": "一括"}, {"name": "インターネット", "category": "通信費", "value": 2189, "unit": "円", "frequency": "月"}]}},
+    {"input": "インターネット使用料：金額未定", "expected": {"value": None}},
 ]
 
 TEST_CASES_LAYOUT2 = [
-    {"input": "3LDK", "expected": {"values": ["3LDK"], }},
-    {"input": "2LDK・3LDK", "expected": {"values": ["2LDK", "3LDK"], }},
-    {"input": "1LDK～3LDK", "expected": {"values": ["1LDK", "2LDK", "3LDK"], }},
-    {"input": "2LDK+S（納戸）・3LDK", "expected": {"values": ["2LDK+S", "3LDK"], }},
-    {"input": "1R～3LDK", "expected": {"values": ["1R", "1LDK", "2LDK", "3LDK"], }},
-    {"input": "2LDK+S（納戸）～3LDK(2LDK+1S(サービスルーム(N))～3LDK)", "expected": {"values": ['2LDK+S', '2LDK+1S', '3LDK'], }},
-    {"input": "2LDK・3LDK(2LDK+S(シューズインクローク)・3LDK+F(ファミリークロゼット))", "expected": {"values": ["2LDK", "3LDK", "3LDK+F"], }},
-    {"input": "1LDK～4LDK(1LDK・2LDK・2LDK+S(納戸)・3LDK・3LDK+S(納戸)・4LDK)", "expected": {"values": ['1LDK', '2LDK', '2LDK+S', '3LDK', '3LDK+S', '4LDK'], }},
-    {"input": "1LDK～3LDK+S（納戸）(1LDK・2LDK・3LDK・3LDK+S(納戸))", "expected": {"values": ["1LDK", "2LDK", "3LDK", "3LDK+S"], }},
-    {"input": "2LDK～3LDK (2LDK～3LDK+WIC+SIC)", "expected": {"values": ["2LDK", "3LDK"], }},
+    {"input": "3LDK", "expected": {"values": ["3LDK"]}},
+    {"input": "2LDK・3LDK", "expected": {"values": ["2LDK", "3LDK"]}},
+    {"input": "1LDK～3LDK", "expected": {"values": ["1LDK", "2LDK", "3LDK"]}},
+    {"input": "2LDK+S（納戸）・3LDK", "expected": {"values": ["2LDK+S", "3LDK"]}},
+    {"input": "1R～3LDK", "expected": {"values": ["1R", "1LDK", "2LDK", "3LDK"]}},
+    {"input": "2LDK+S（納戸）～3LDK(2LDK+1S(サービスルーム(N))～3LDK)", "expected": {"values": ['2LDK+S', '2LDK+1S', '3LDK']}},
+    {"input": "2LDK・3LDK(2LDK+S(シューズインクローク)・3LDK+F(ファミリークロゼット))", "expected": {"values": ["2LDK", "3LDK", "3LDK+F"]}},
+    {"input": "1LDK～4LDK(1LDK・2LDK・2LDK+S(納戸)・3LDK・3LDK+S(納戸)・4LDK)", "expected": {"values": ['1LDK', '2LDK', '2LDK+S', '3LDK', '3LDK+S', '4LDK']}},
+    {"input": "1LDK～3LDK+S（納戸）(1LDK・2LDK・3LDK・3LDK+S(納戸))", "expected": {"values": ["1LDK", "2LDK", "3LDK", "3LDK+S"]}},
+    {"input": "2LDK～3LDK (2LDK～3LDK+WIC+SIC)", "expected": {"values": ["2LDK", "3LDK"]}},
 ]
 
 TEST_CASES_AREA = [
-    {"input": "56.64m2～79.2m2", "expected": {"unit": "m^2", "min": 56.64, "max": 79.2, "value": 67.92, "tsubo": 20.55, "min_tsubo": 17.13, "max_tsubo": 23.96, }},
-    {"input": "56.7m2・59.43m2", "expected": {"unit": "m^2", "value": 56.7, "tsubo": 17.15, }},
-    {"input": "63.83m2～104.42m2、 (全戸にトランクルーム面積0.22m2～0.42m2を含む)", "expected": {"unit": "m^2", "min": 0.42, "max": 104.42, "value": 52.42, "tsubo": 15.86, "min_tsubo": 0.13, "max_tsubo": 31.59, }},
-    {"input": "64.06m2～80.32m2、（トランクルーム面積0.26m2含む）", "expected": {"unit": "m^2", "min": 64.06, "max": 80.32, "value": 72.19, "tsubo": 21.84, "min_tsubo": 19.38, "max_tsubo": 24.3, }},
-    {"input": "73.99m2、(専用トランクルーム面積含む)", "expected": {"unit": "m^2", "value": 73.99, "tsubo": 22.38, }},
-    {"input": "58.75m2～77.04m2、（防災備蓄倉庫面積 0.81m2・1.80m2含む）", "expected": {"unit": "m^2", "min": 58.75, "max": 77.04, "value": 67.895, "tsubo": 20.54, "min_tsubo": 17.77, "max_tsubo": 23.3, }},
-    {"input": "69.79m2・73.99m2、(専用トランクルーム面積0.27m2・0.45m2含む)", "expected": {"unit": "m^2", "value": 69.79, "tsubo": 21.11, }},
-    {"input": "31.84m2～141.66m2、(トランクルーム面積0.97m2～2.11m2含む)", "expected": {"unit": "m^2", "min": 2.11, "max": 141.66, "value": 71.885, "tsubo": 21.75, "min_tsubo": 0.64, "max_tsubo": 42.85, }},
-    {"input": "42.88m2～208.17m2", "expected": {"unit": "m^2", "min": 42.88, "max": 208.17, "value": 125.525, "tsubo": 37.97, "min_tsubo": 12.97, "max_tsubo": 62.97, }},
-    {"input": "75m2～78.57m2、(トランクルーム面積含む)", "expected": {"unit": "m^2", "min": 75.0, "max": 78.57, "value": 76.785, "tsubo": 23.23, "min_tsubo": 22.69, "max_tsubo": 23.77, }},
+    {"input": "56.64m2～79.2m2", "expected": {"unit": "m^2", "min": 56.64, "max": 79.2, "value": 67.92}},
+    {"input": "56.7m2・59.43m2", "expected": {"unit": "m^2", "value": 56.7}},
+    {"input": "63.83m2～104.42m2、 (全戸にトランクルーム面積0.22m2～0.42m2を含む)", "expected": {"unit": "m^2", "min": 0.42, "max": 104.42, "value": 52.42}},
+    {"input": "64.06m2～80.32m2、（トランクルーム面積0.26m2含む）", "expected": {"unit": "m^2", "min": 64.06, "max": 80.32, "value": 72.19}},
+    {"input": "73.99m2、(専用トランクルーム面積含む)", "expected": {"unit": "m^2", "value": 73.99}},
+    {"input": "58.75m2～77.04m2、（防災備蓄倉庫面積 0.81m2・1.80m2含む）", "expected": {"unit": "m^2", "min": 58.75, "max": 77.04, "value": 67.895}},
+    {"input": "69.79m2・73.99m2、(専用トランクルーム面積0.27m2・0.45m2含む)", "expected": {"unit": "m^2", "value": 69.79}},
+    {"input": "31.84m2～141.66m2、(トランクルーム面積0.97m2～2.11m2含む)", "expected": {"unit": "m^2", "min": 2.11, "max": 141.66, "value": 71.885}},
+    {"input": "42.88m2～208.17m2", "expected": {"unit": "m^2", "min": 42.88, "max": 208.17, "value": 125.525}},
+    {"input": "75m2～78.57m2、(トランクルーム面積含む)", "expected": {"unit": "m^2", "min": 75.0, "max": 78.57, "value": 76.785}},
 ]
 
 TEST_CASES_DATE_EXACT2 = [
-    {"input": "-", "expected": {"date": None, }},
-    {"input": "2024/03/31", "expected": {"date": "2024-03-31", }},
-    {"input": "2024/06/30", "expected": {"date": "2024-06-30", }},
-    {"input": "2024/02/29", "expected": {"date": "2024-02-29", }},
-    {"input": "2025/02/28", "expected": {"date": "2025-02-28", }},
-    {"input": "2024/12/15", "expected": {"date": "2024-12-15", }},
-    {"input": "2024/03/01", "expected": {"date": "2024-03-01", }},
-    {"input": "2024/12/31", "expected": {"date": "2024-12-31", }},
-    {"input": "2025/09/27", "expected": {"date": "2025-09-27", }},
-    {"input": "2025/04/29", "expected": {"date": "2025-04-29", }},
+    {"input": "-", "expected": {"date": None}},
+    {"input": "2024/03/31", "expected": {"date": "2024-03-31"}},
+    {"input": "2024/06/30", "expected": {"date": "2024-06-30"}},
+    {"input": "2024/02/29", "expected": {"date": "2024-02-29"}},
+    {"input": "2025/02/28", "expected": {"date": "2025-02-28"}},
+    {"input": "2024/12/15", "expected": {"date": "2024-12-15"}},
+    {"input": "2024/03/01", "expected": {"date": "2024-03-01"}},
+    {"input": "2024/12/31", "expected": {"date": "2024-12-31"}},
+    {"input": "2025/09/27", "expected": {"date": "2025-09-27"}},
+    {"input": "2025/04/29", "expected": {"date": "2025-04-29"}},
 ]
 
 TEST_CASES_DELIVERY_DATE = [
-    {"input": "即引渡可", "expected": {"type": "immediate", }},
-    {"input": "即引渡可※諸手続き完了後", "expected": {"type": "immediate", "note": "諸手続き完了後", }},
-    {"input": "2025年3月下旬予定", "expected": {"year": 2025, "month": 3, "is_planned": True, "period_text": "下旬", "estimated_date": "2025-03-25", }},
-    {"input": "2025年6月中旬予定", "expected": {"year": 2025, "month": 6, "is_planned": True, "period_text": "中旬", "estimated_date": "2025-06-15", }},
-    {"input": "2025年8月上旬予定", "expected": {"year": 2025, "month": 8, "is_planned": True, "period_text": "上旬", "estimated_date": "2025-08-05", }},
-    {"input": "2025年4月予定", "expected": {"year": 2025, "month": 4, "is_planned": True, "estimated_date": "2025-04-01", }},
-    {"input": "2025年9月末予定", "expected": {"year": 2025, "month": 9, "is_planned": True, "period_text": "末", "estimated_date": "2025-09-30", }},
-    {"input": "即引渡可※諸手続後（第1街区）、2025年3月下旬予定（第2街区）", "expected": {"type": "immediate", "note": "諸手続き完了後", }},
-    {"input": "2025年4月29日予定※完売時期によっては変更となる場合がございます。", "expected": {"year": 2025, "month": 4, "day": 29, "estimated_date": "2025-04-29", }},
-    {"input": "2026年4月中旬予定 ※2025年1月以降にご契約の方の引渡は、2026年3月上旬(予定)から変更となります。", "expected": {"year": 2026, "month": 4, "is_planned": True, "period_text": "上旬", "estimated_date": "2026-04-05", }},
+    {"input": "即引渡可", "expected": {"type": "immediate"}},
+    {"input": "即引渡可※諸手続き完了後", "expected": {"type": "immediate", "note": "諸手続き完了後"}},
+    {"input": "2025年3月下旬予定", "expected": {"year": 2025, "month": 3, "is_planned": True, "period_text": "下旬", "estimated_date": "2025-03-25"}},
+    {"input": "2025年6月中旬予定", "expected": {"year": 2025, "month": 6, "is_planned": True, "period_text": "中旬", "estimated_date": "2025-06-15"}},
+    {"input": "2025年8月上旬予定", "expected": {"year": 2025, "month": 8, "is_planned": True, "period_text": "上旬", "estimated_date": "2025-08-05"}},
+    {"input": "2025年4月予定", "expected": {"year": 2025, "month": 4, "is_planned": True, "estimated_date": "2025-04-01"}},
+    {"input": "2025年9月末予定", "expected": {"year": 2025, "month": 9, "is_planned": True, "period_text": "末", "estimated_date": "2025-09-30"}},
+    {"input": "即引渡可※諸手続後（第1街区）、2025年3月下旬予定（第2街区）", "expected": {"type": "immediate", "note": "諸手続き完了後"}},
+    {"input": "2025年4月29日予定※完売時期によっては変更となる場合がございます。", "expected": {"year": 2025, "month": 4, "day": 29, "estimated_date": "2025-04-29"}},
+    {"input": "2026年4月中旬予定 ※2025年1月以降にご契約の方の引渡は、2026年3月上旬(予定)から変更となります。", "expected": {"year": 2026, "month": 4, "is_planned": True, "period_text": "上旬", "estimated_date": "2026-04-05"}},
 ]
 
 TEST_CASES_FLOOR = [
-    {"input": "-", "expected": {"value": None, }},
-    {"input": "1階", "expected": {"value": 1, "unit": "階", }},
-    {"input": "2階", "expected": {"value": 2, "unit": "階", }},
-    {"input": "3階", "expected": {"value": 3, "unit": "階", }},
-    {"input": "5階", "expected": {"value": 5, "unit": "階", }},
-    {"input": "6階", "expected": {"value": 6, "unit": "階", }},
-    {"input": "7階", "expected": {"value": 7, "unit": "階", }},
-    {"input": "8階", "expected": {"value": 8, "unit": "階", }},
-    {"input": "10階", "expected": {"value": 10, "unit": "階", }},
-    {"input": "13階", "expected": {"value": 13, "unit": "階", }},
+    {"input": "-", "expected": {"value": None}},
+    {"input": "1階", "expected": {"value": 1, "unit": "階"}},
+    {"input": "2階", "expected": {"value": 2, "unit": "階"}},
+    {"input": "3階", "expected": {"value": 3, "unit": "階"}},
+    {"input": "5階", "expected": {"value": 5, "unit": "階"}},
+    {"input": "6階", "expected": {"value": 6, "unit": "階"}},
+    {"input": "7階", "expected": {"value": 7, "unit": "階"}},
+    {"input": "8階", "expected": {"value": 8, "unit": "階"}},
+    {"input": "10階", "expected": {"value": 10, "unit": "階"}},
+    {"input": "13階", "expected": {"value": 13, "unit": "階"}},
 ]
 
 TEST_CASES_DIRECTION = [
-    {"input": "-", "expected": {"value": None, }},
-    {"input": "南", "expected": {"value": "南", }},
-    {"input": "東", "expected": {"value": "東", }},
-    {"input": "西", "expected": {"value": "西", }},
-    {"input": "北", "expected": {"value": "北", }},
-    {"input": "南東", "expected": {"value": "南東", }},
-    {"input": "南西", "expected": {"value": "南西", }},
-    {"input": "北東", "expected": {"value": "北東", }},
-    {"input": "北西", "expected": {"value": "北西", }},
-    {"input": "南北", "expected": {"value": "南北", }},
+    {"input": "-", "expected": {"value": None}},
+    {"input": "南", "expected": {"value": "南"}},
+    {"input": "東", "expected": {"value": "東"}},
+    {"input": "西", "expected": {"value": "西"}},
+    {"input": "北", "expected": {"value": "北"}},
+    {"input": "南東", "expected": {"value": "南東"}},
+    {"input": "南西", "expected": {"value": "南西"}},
+    {"input": "北東", "expected": {"value": "北東"}},
+    {"input": "北西", "expected": {"value": "北西"}},
+    {"input": "南北", "expected": {"value": "南北"}},
 ]
 
 
@@ -2604,4 +2646,84 @@ TEST_CASES_BUILDING_COVERAGE = [
     {"input": "80％・500％", "expected": {"building_coverage": 80.0, "floor_area_ratio": 500.0, "unit": "%"}},
     {"input": "30％・50％", "expected": {"building_coverage": 30.0, "floor_area_ratio": 50.0, "unit": "%"}},
     {"input": "-", "expected": {"value": None}},
+]
+
+TEST_MAPPING = [
+    # 住所関連
+    ("TEST_CASES_ADDRESS", TEST_CASES_ADDRESS, clean_address_to_json),
+    
+    # 交通関連
+    ("TEST_CASES_ACCESS", TEST_CASES_ACCESS, clean_access_to_json),
+    
+    # 戸数関連
+    ("TEST_CASES_UNITS1", TEST_CASES_UNITS1, clean_units_to_json, "総戸数"),
+    ("TEST_CASES_UNITS2", TEST_CASES_UNITS2, clean_units_to_json, "今回販売戸数"),
+    
+    # 用途地域関連
+    ("TEST_CASES_ZONING", TEST_CASES_ZONING, clean_zoning_to_json),
+    
+    # 日付関連
+    ("TEST_CASES_DATE1", TEST_CASES_DATE1, clean_date_to_json),
+    ("TEST_CASES_DATE2", TEST_CASES_DATE2, clean_delivery_date_to_json),
+    ("TEST_CASES_DATE_EXACT", TEST_CASES_DATE_EXACT, clean_expiry_date_to_json),
+    ("TEST_CASES_DATE_EXACT2", TEST_CASES_DATE_EXACT2, clean_expiry_date_to_json),
+    ("TEST_CASES_DELIVERY_DATE", TEST_CASES_DELIVERY_DATE, clean_delivery_date_to_json),
+    
+    # 価格関連
+    ("TEST_CASES_PRICE", TEST_CASES_PRICE, clean_price_to_json),
+    ("TEST_CASES_PRICE_MISC", TEST_CASES_PRICE_MISC, clean_price_to_json),
+    ("TEST_CASES_PRICE_BAND", TEST_CASES_PRICE_BAND, clean_price_band_to_json),
+    ("TEST_CASES_PRICE_BAND_EXTRA", TEST_CASES_PRICE_BAND_EXTRA, clean_price_band_to_json),
+    ("TEST_CASES_PRICE_BAND2", TEST_CASES_PRICE_BAND2, clean_price_band_to_json),
+    
+    # 管理費関連
+    ("TEST_CASES_MANAGEMENT_FEE", TEST_CASES_MANAGEMENT_FEE, clean_management_fee_to_json),
+    ("TEST_CASES_MANAGEMENT_PREP_FEE", TEST_CASES_MANAGEMENT_PREP_FEE, clean_management_fee_to_json),
+    ("TEST_CASES_REPAIR_FUND", TEST_CASES_REPAIR_FUND, clean_management_fee_to_json),
+    ("TEST_CASES_REPAIR_FUND_BASIC", TEST_CASES_REPAIR_FUND_BASIC, clean_management_fee_to_json),
+    ("TEST_CASES_REPAIR_FUND_BASIC2", TEST_CASES_REPAIR_FUND_BASIC2, clean_management_fee_to_json),
+    
+    # その他経費関連
+    ("TEST_CASES_OTHER_EXPENSES", TEST_CASES_OTHER_EXPENSES, clean_other_expenses_to_json),
+    ("TEST_CASES_OTHER_EXPENSES2", TEST_CASES_OTHER_EXPENSES2, clean_other_expenses_to_json),
+    
+    # 間取り関連
+    ("TEST_CASES_LAYOUT", TEST_CASES_LAYOUT, clean_layout_to_json),
+    ("TEST_CASES_LAYOUT2", TEST_CASES_LAYOUT2, clean_layout_to_json),
+    
+    # 面積関連
+    ("TEST_CASES_AREAS", TEST_CASES_AREAS, clean_multiple_area_to_json),
+    ("TEST_CASES_AREA", TEST_CASES_AREA, clean_area_to_json),
+    
+    # 制限事項関連
+    ("TEST_CASES_RESTRICTIONS", TEST_CASES_RESTRICTIONS, clean_restrictions_to_json),
+    
+    # 階数・方向関連
+    ("TEST_CASES_FLOOR", TEST_CASES_FLOOR, clean_number_to_json),
+    ("TEST_CASES_DIRECTION", TEST_CASES_DIRECTION, clean_text_to_json),
+    
+    # 特徴ピックアップ関連  
+    ("TEST_CASES_FEATURE_PICKUP", TEST_CASES_FEATURE_PICKUP, clean_feature_pickup_to_json),
+    
+    # 建物構造関連
+    ("TEST_CASES_BUILDING_STRUCTURE", TEST_CASES_BUILDING_STRUCTURE, clean_building_structure_to_json),
+    ("TEST_CASES_BUILDING_STRUCTURE2", TEST_CASES_BUILDING_STRUCTURE2, clean_building_structure_to_json),
+    
+    # リフォーム関連
+    ("TEST_CASES_REFORM", TEST_CASES_REFORM, clean_reform_to_json),
+    
+    # 周辺施設関連
+    ("TEST_CASES_SURROUNDING_FACILITIES", TEST_CASES_SURROUNDING_FACILITIES, clean_surrounding_facilities_to_json),
+    
+    # 駐車場関連
+    ("TEST_CASES_PARKING", TEST_CASES_PARKING, clean_parking_to_json),
+    
+    # 地目関連
+    ("TEST_CASES_LAND_USE", TEST_CASES_LAND_USE, clean_land_use_to_json),
+    
+    # 間取り図関連
+    ("TEST_CASES_FLOOR_PLAN", TEST_CASES_FLOOR_PLAN, clean_floor_plan_to_json),
+    
+    # 建ぺい率・容積率関連
+    ("TEST_CASES_BUILDING_COVERAGE", TEST_CASES_BUILDING_COVERAGE, clean_building_coverage_to_json),
 ]
