@@ -19,11 +19,34 @@ sys.path.insert(0, str(project_root))
 from kklogger import set_logger
 from kkpsgre.connector import DBConnector
 from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
-from kkestate.util.data_analyzer import get_sample_data
+# get_sample_data function moved here from util/data_analyzer.py
 from kkestate.util.key_mapper import get_processing_info_for_key
 from kkestate.util.json_cleaner import extract_period_from_key
 
 LOGGER = set_logger(__name__)
+
+def get_sample_data(db, key_id: int, limit: Optional[int] = 100) -> list:
+    """
+    指定されたkey_idのサンプルデータを取得
+    """
+    try:
+        base_sql = f"""
+            SELECT value 
+            FROM estate_detail 
+            WHERE id_key = {key_id} 
+            AND value IS NOT NULL 
+            AND value != ''
+        """
+        
+        if limit is not None:
+            sql = base_sql + f" LIMIT {limit}"
+        else:
+            sql = base_sql + " LIMIT 10000"  # --allフラグ使用時はLIMIT 10000
+        
+        df = db.select_sql(sql)
+        return df['value'].tolist() if not df.empty else []
+    except Exception:
+        return []
 
 def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool = False, specific_key_id: Optional[Union[int, List[int]]] = None):
     """

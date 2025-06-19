@@ -1,4 +1,1 @@
-from .cleansing import (
-    clean_price, clean_layout, clean_area, clean_access,
-    clean_date, clean_address, clean_number, clean_management_fee, clean_boolean
-)
+# Legacy cleansing functions removed - replaced by json_cleaner.py
