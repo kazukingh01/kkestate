@@ -4,7 +4,7 @@
 
 import re
 from typing import Tuple, Callable, Dict, Any, Optional
-from .schema_generator import generate_type_schema_from_function
+from ..master.json_schemas import SCHEMAS
 from .json_cleaner import (
     clean_price_to_json, clean_area_to_json, clean_layout_to_json, 
     clean_date_to_json, clean_management_fee_to_json, clean_number_to_json, 
@@ -37,10 +37,54 @@ def get_processing_info_for_key(key_name: str) -> Tuple[str, Callable, Dict[str,
     # 処理関数と清浄化名を取得
     cleaned_name, processing_function = map_key_to_processing_info(key_name)
     
-    # 型スキーマを取得
-    type_schema = generate_type_schema_from_function(processing_function, cleaned_name, has_period)
+    # 型スキーマを取得（SCHEMAS から直接取得）
+    type_schema = get_type_schema_from_schemas(cleaned_name, has_period)
     
     return cleaned_name, processing_function, type_schema
+
+def get_type_schema_from_schemas(cleaned_name: str, has_period: bool = False) -> Dict[str, Any]:
+    """
+    SCHEMAS から型スキーマを取得し、period情報を追加
+    
+    Args:
+        cleaned_name: estate_mst_cleaned.name
+        has_period: 期別情報を含むかどうか
+        
+    Returns:
+        Dict[str, Any]: 型スキーマ
+    """
+    if cleaned_name is None:
+        return {}
+    
+    # SCHEMAS から基本スキーマを取得
+    base_schema = SCHEMAS.get(cleaned_name, {})
+    
+    if not base_schema:
+        # フォールバック: 基本的なテキストスキーマ
+        return {
+            "base_type": "structured_text",
+            "required_fields": [],
+            "optional_fields": ["value"],
+            "field_types": {
+                "value": [str, type(None)]
+            }
+        }
+    
+    # 基本スキーマをコピー
+    schema = base_schema.copy()
+    
+    # period情報を追加
+    if has_period:
+        if "optional_fields" not in schema:
+            schema["optional_fields"] = []
+        if "period" not in schema["optional_fields"]:
+            schema["optional_fields"].append("period")
+        
+        if "field_types" not in schema:
+            schema["field_types"] = {}
+        schema["field_types"]["period"] = [int, type(None)]
+    
+    return schema
 
 def map_key_to_processing_info(key_name: str) -> Tuple[str, Callable]:
     """

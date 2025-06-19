@@ -4,8 +4,9 @@ test_schema_validation.py - estate_mst_cleaned/type のスキーマ検証テス�
 
 import argparse
 from kklogger import set_logger
-from .MST import TEST_MAPPING, EXPECTED_KEY_PROCESSING, EXPECTED_SCHEMAS
+from .MST import TEST_MAPPING, EXPECTED_KEY_PROCESSING
 from kkestate.util.key_mapper import get_processing_info_for_key
+from kkestate.master.json_schemas import SCHEMAS
 
 LOGGER = set_logger(__name__)
 
@@ -30,10 +31,10 @@ def validate_json_output_schema(output_json: dict, cleaned_name: str) -> tuple[b
     Returns:
         tuple[bool, str]: (検証結果, エラーメッセージ)
     """
-    if cleaned_name is None or cleaned_name not in EXPECTED_SCHEMAS:
+    if cleaned_name is None or cleaned_name not in SCHEMAS:
         return True, ""  # スキーマが定義されていない場合は検証しない
     
-    schema = EXPECTED_SCHEMAS[cleaned_name]
+    schema = SCHEMAS[cleaned_name]
     expected_fields = set(schema.get("required_fields", []) + schema.get("optional_fields", []))
     actual_fields = set(output_json.keys())
     
@@ -62,12 +63,12 @@ def validate_json_output_schema(output_json: dict, cleaned_name: str) -> tuple[b
 
 def test_type_schema_consistency():
     """
-    get_processing_info_for_keyが返すtype_schemaがEXPECTED_SCHEMASと一致するかテスト
+    get_processing_info_for_keyが返すtype_schemaがSCHEMASと一致するかテスト
     """
     total_tests = 0
     failed_tests = 0
     
-    LOGGER.info("Testing type_schema consistency with EXPECTED_SCHEMAS")
+    LOGGER.info("Testing type_schema consistency with SCHEMAS")
     
     # EXPECTED_KEY_PROCESSINGの各項目についてテスト
     for entry in EXPECTED_KEY_PROCESSING:
@@ -92,13 +93,13 @@ def test_type_schema_consistency():
                 LOGGER.info(f"    Actual: {actual_cleaned_name}")
                 continue
             
-            # EXPECTED_SCHEMASに定義があるかチェック
-            if expected_cleaned_name not in EXPECTED_SCHEMAS:
-                LOGGER.info(f"  SKIP: {key_name} -> {expected_cleaned_name} (EXPECTED_SCHEMASに未定義)")
+            # SCHEMASに定義があるかチェック
+            if expected_cleaned_name not in SCHEMAS:
+                LOGGER.info(f"  SKIP: {key_name} -> {expected_cleaned_name} (SCHEMASに未定義)")
                 total_tests -= 1
                 continue
                 
-            expected_schema = EXPECTED_SCHEMAS[expected_cleaned_name]
+            expected_schema = SCHEMAS[expected_cleaned_name]
             
             # type_schemaの比較
             schema_matches = True

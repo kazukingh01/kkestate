@@ -11,7 +11,7 @@
 
 注記:
 データクレンジング機能は kkestate.util.json_cleaner に配置されています.
-キーマッピング機能は kkestate.util.key_processing_mapper に配置されています.
+キーマッピング機能は kkestate.util.key_mapper に配置されています.
 """
 
 __all__ = []
