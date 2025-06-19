@@ -51,7 +51,7 @@ def get_type_schema_from_schemas(cleaned_name: str, has_period: bool = False) ->
         has_period: 期別情報を含むかどうか
         
     Returns:
-        Dict[str, Any]: 型スキーマ
+        Dict[str, Any]: 型スキーマ（JSONシリアライズ可能）
     """
     if cleaned_name is None:
         return {}
@@ -66,12 +66,45 @@ def get_type_schema_from_schemas(cleaned_name: str, has_period: bool = False) ->
             "required_fields": [],
             "optional_fields": ["value"],
             "field_types": {
-                "value": [str, type(None)]
+                "value": ["string", "null"]
             }
         }
     
-    # 基本スキーマをコピー
-    schema = base_schema.copy()
+    # 基本スキーマを深くコピー（field_typesも含めて）
+    import copy
+    schema = copy.deepcopy(base_schema)
+    
+    # field_types内のPython typeオブジェクトを文字列に変換
+    if "field_types" in schema:
+        converted_types = {}
+        for field, types in schema["field_types"].items():
+            if not isinstance(types, list):
+                types = [types]
+            
+            # typeオブジェクトを文字列に変換
+            type_strings = []
+            for t in types:
+                if t == str:
+                    type_strings.append("string")
+                elif t == int:
+                    type_strings.append("integer")
+                elif t == float:
+                    type_strings.append("number")
+                elif t == bool:
+                    type_strings.append("boolean")
+                elif t == list:
+                    type_strings.append("array")
+                elif t == dict:
+                    type_strings.append("object")
+                elif t == type(None):
+                    type_strings.append("null")
+                else:
+                    # その他の型は文字列として扱う
+                    type_strings.append("string")
+            
+            converted_types[field] = type_strings if len(type_strings) > 1 else type_strings[0]
+        
+        schema["field_types"] = converted_types
     
     # period情報を追加
     if has_period:
@@ -82,7 +115,7 @@ def get_type_schema_from_schemas(cleaned_name: str, has_period: bool = False) ->
         
         if "field_types" not in schema:
             schema["field_types"] = {}
-        schema["field_types"]["period"] = [int, type(None)]
+        schema["field_types"]["period"] = ["integer", "null"]
     
     return schema
 

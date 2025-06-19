@@ -250,14 +250,18 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
         if update_db:
             try:
                 # estate_mst_cleanedに項目を挿入または取得
-                insert_cleaned_sql = """
+                # SQLインジェクション対策のため、文字列をエスケープ
+                escaped_name = cleaned_name.replace("'", "''")
+                escaped_type = json.dumps(type_schema, ensure_ascii=False).replace("'", "''")
+                
+                insert_cleaned_sql = f"""
                 INSERT INTO estate_mst_cleaned (name, type) 
-                VALUES (%s, %s)
+                VALUES ('{escaped_name}', '{escaped_type}')
                 ON CONFLICT (name) DO UPDATE SET type = EXCLUDED.type
                 RETURNING id;
                 """
                 
-                result = db.execute_sql(insert_cleaned_sql, (cleaned_name, json.dumps(type_schema, ensure_ascii=False)))
+                result = db.execute_sql(insert_cleaned_sql)
                 
                 if result and len(result) > 0:
                     cleaned_id = result[0][0]
@@ -272,8 +276,8 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
                         continue
                 
                 # estate_mst_keyのid_cleanedを更新
-                update_key_sql = "UPDATE estate_mst_key SET id_cleaned = %s WHERE id = %s"
-                db.execute_sql(update_key_sql, (cleaned_id, key_id))
+                update_key_sql = f"UPDATE estate_mst_key SET id_cleaned = {cleaned_id} WHERE id = {key_id}"
+                db.execute_sql(update_key_sql)
                 
                 update_count += 1
                 LOGGER.info(f"  更新完了: estate_mst_cleaned.id={cleaned_id}, estate_mst_key.id_cleaned={cleaned_id}")
@@ -446,15 +450,18 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
             cleaned_id = cleaned_result.iloc[0]['id']
             
             # estate_cleanedに保存
-            insert_sql = """
+            # SQLインジェクション対策のため、文字列をエスケープ
+            escaped_value = json.dumps(cleaned_value, ensure_ascii=False).replace("'", "''")
+            
+            insert_sql = f"""
             INSERT INTO estate_cleaned (id_run, id_key, id_cleaned, value_cleaned)
-            VALUES (%s, %s, %s, %s)
+            VALUES ({run_id}, {key_id}, {cleaned_id}, '{escaped_value}')
             ON CONFLICT (id_run, id_key) DO UPDATE SET
                 id_cleaned = EXCLUDED.id_cleaned,
                 value_cleaned = EXCLUDED.value_cleaned
             """
             
-            db.execute_sql(insert_sql, (run_id, key_id, cleaned_id, json.dumps(cleaned_value, ensure_ascii=False)))
+            db.execute_sql(insert_sql)
         
         return True
         
