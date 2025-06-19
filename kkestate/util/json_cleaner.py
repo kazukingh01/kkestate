@@ -4,13 +4,22 @@ estate_detailの生データをJSONオブジェクトに変換
 """
 
 import re
-import json
-import math
 from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime
-from .address_parser import parse_address_structure
-from .surrounding_facilities_parser import clean_surrounding_facilities_to_json
-from .land_use_parser import parse_land_use_to_json
+from .parser import (
+    parse_address_structure,
+    clean_surrounding_facilities_to_json,
+    parse_land_use_to_json,
+    parse_floor_structure_to_json,
+    parse_reform_to_json,
+    parse_building_structure_to_json,
+    parse_parking_to_json,
+    parse_floor_plan_to_json,
+    parse_building_coverage_to_json,
+    get_building_structure_analysis_schema,
+    get_parking_analysis_schema,
+    get_structure_analysis_schema,
+    get_reform_analysis_schema
+)
 
 def _should_nullify_text(value: str) -> bool:
     """
@@ -2047,23 +2056,23 @@ def create_type_schema(base_key: str, sample_values: List[str]) -> Dict[str, Any
     
     # 建物構造の特殊処理（「構造・階建て」など）
     if "構造" in base_key and "階建" in base_key and "所在階" not in base_key:
-        from .building_structure_parser import get_building_structure_analysis_schema
+        # get_building_structure_analysis_schema already imported from .parser
         return get_building_structure_analysis_schema()
     
     # 駐車場の特殊処理
     if "駐車場" in base_key:
-        from .parking_parser import get_parking_analysis_schema
+        # get_parking_analysis_schema already imported from .parser
         return get_parking_analysis_schema()
     
     # 構造階建の特殊処理（「所在階/構造・階建」など）
     structure_keywords = ["所在階", "構造", "階建"]
     if any(keyword in base_key for keyword in structure_keywords):
-        from .structure_parser import get_structure_analysis_schema
+        # get_structure_analysis_schema already imported from .parser
         return get_structure_analysis_schema()
     
     # リフォームの特殊処理
     if "リフォーム" in base_key:
-        from .reform_parser import get_reform_analysis_schema
+        # get_reform_analysis_schema already imported from .parser
         return get_reform_analysis_schema()
     
     # 用途地域の特殊処理
@@ -3830,7 +3839,7 @@ def clean_structure_to_json(value: str, raw_key: str = "", period: Optional[int]
     構造・階建情報をJSON形式でクレンジング
     「所在階/構造・階建」データを構造化JSONに変換
     """
-    from .structure_parser import parse_floor_structure_to_json
+    # parse_floor_structure_to_json already imported from .parser
     return parse_floor_structure_to_json(value, period)
 
 def clean_reform_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
@@ -3838,7 +3847,7 @@ def clean_reform_to_json(value: str, raw_key: str = "", period: Optional[int] = 
     リフォーム情報をJSON形式でクレンジング
     完了日付、リフォーム箇所等を構造化
     """
-    from .reform_parser import parse_reform_to_json
+    # parse_reform_to_json already imported from .parser
     return parse_reform_to_json(value, period)
 
 def clean_building_structure_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
@@ -3846,7 +3855,7 @@ def clean_building_structure_to_json(value: str, raw_key: str = "", period: Opti
     建物構造・階建て情報をJSON形式でクレンジング
     「構造・階建て」データを構造化
     """
-    from .building_structure_parser import parse_building_structure_to_json
+    # parse_building_structure_to_json already imported from .parser
     return parse_building_structure_to_json(value, period)
 
 def clean_parking_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
@@ -3854,7 +3863,7 @@ def clean_parking_to_json(value: str, raw_key: str = "", period: Optional[int] =
     駐車場情報をJSON形式でクレンジング
     空き状況、料金、台数等を構造化
     """
-    from .parking_parser import parse_parking_to_json
+    # parse_parking_to_json already imported from .parser
     return parse_parking_to_json(value, period)
 
 def clean_land_use_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
@@ -3869,7 +3878,7 @@ def clean_floor_plan_to_json(value: str, raw_key: str = "", period: Optional[int
     間取り図情報をJSON形式でクレンジング
     物件詳細情報を構造化して処理
     """
-    from .floor_plan_parser import parse_floor_plan_to_json
+    # parse_floor_plan_to_json already imported from .parser
     return parse_floor_plan_to_json(value, period)
 
 def clean_building_coverage_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
@@ -3877,5 +3886,5 @@ def clean_building_coverage_to_json(value: str, raw_key: str = "", period: Optio
     建ぺい率・容積率情報をJSON形式でクレンジング
     建ぺい率と容積率を数値化して処理
     """
-    from .building_coverage_parser import parse_building_coverage_to_json
+    # parse_building_coverage_to_json already imported from .parser
     return parse_building_coverage_to_json(value, period)

@@ -5,6 +5,7 @@ test_schema_validation.py - estate_mst_cleaned/type のスキーマ検証テス�
 import argparse
 from kklogger import set_logger
 from .MST import TEST_MAPPING, EXPECTED_KEY_PROCESSING, EXPECTED_SCHEMAS
+from kkestate.util.key_mapper import get_processing_info_for_key
 
 LOGGER = set_logger(__name__)
 
@@ -58,6 +59,83 @@ def validate_json_output_schema(output_json: dict, cleaned_name: str) -> tuple[b
                 return False, f"フィールド '{field}' の型が不正です。期待: {expected_types}, 実際: {type(value)}"
     
     return True, ""
+
+def test_type_schema_consistency():
+    """
+    get_processing_info_for_keyが返すtype_schemaがEXPECTED_SCHEMASと一致するかテスト
+    """
+    total_tests = 0
+    failed_tests = 0
+    
+    LOGGER.info("Testing type_schema consistency with EXPECTED_SCHEMAS")
+    
+    # EXPECTED_KEY_PROCESSINGの各項目についてテスト
+    for entry in EXPECTED_KEY_PROCESSING:
+        key_name = entry["key_name"]
+        expected_cleaned_name = entry["expected_cleaned_name"]
+        
+        # 強制null項目はスキップ
+        if expected_cleaned_name is None:
+            continue
+            
+        total_tests += 1
+        
+        try:
+            # get_processing_info_for_keyから実際のスキーマを取得
+            actual_cleaned_name, processing_function, actual_type_schema = get_processing_info_for_key(key_name)
+            
+            # cleaned_nameが一致するかチェック
+            if actual_cleaned_name != expected_cleaned_name:
+                failed_tests += 1
+                LOGGER.info(f"  FAIL: {key_name} - cleaned_name不一致", color=["BOLD", "RED"])
+                LOGGER.info(f"    Expected: {expected_cleaned_name}")
+                LOGGER.info(f"    Actual: {actual_cleaned_name}")
+                continue
+            
+            # EXPECTED_SCHEMASに定義があるかチェック
+            if expected_cleaned_name not in EXPECTED_SCHEMAS:
+                LOGGER.info(f"  SKIP: {key_name} -> {expected_cleaned_name} (EXPECTED_SCHEMASに未定義)")
+                total_tests -= 1
+                continue
+                
+            expected_schema = EXPECTED_SCHEMAS[expected_cleaned_name]
+            
+            # type_schemaの比較
+            schema_matches = True
+            error_details = []
+            
+            # required_fieldsの比較
+            expected_required = set(expected_schema.get("required_fields", []))
+            actual_required = set(actual_type_schema.get("required_fields", []))
+            if expected_required != actual_required:
+                schema_matches = False
+                error_details.append(f"required_fields不一致: expected={sorted(expected_required)}, actual={sorted(actual_required)}")
+            
+            # optional_fieldsの比較
+            expected_optional = set(expected_schema.get("optional_fields", []))
+            actual_optional = set(actual_type_schema.get("optional_fields", []))
+            if expected_optional != actual_optional:
+                schema_matches = False
+                error_details.append(f"optional_fields不一致: expected={sorted(expected_optional)}, actual={sorted(actual_optional)}")
+            
+            if not schema_matches:
+                failed_tests += 1
+                LOGGER.info(f"  FAIL: {key_name} -> {expected_cleaned_name} - type_schema不一致", color=["BOLD", "RED"])
+                for detail in error_details:
+                    LOGGER.info(f"    {detail}")
+                LOGGER.info(f"    Expected schema: {expected_schema}")
+                LOGGER.info(f"    Actual schema: {actual_type_schema}")
+            
+        except Exception as e:
+            failed_tests += 1
+            LOGGER.info(f"  ERROR: {key_name}: {e}", color=["BOLD", "RED"])
+    
+    # 結果サマリー
+    passed_tests = total_tests - failed_tests
+    LOGGER.info(f"Type Schema Consistency Summary: {passed_tests}/{total_tests} passed, {failed_tests} failed", 
+                color=["BOLD", "GREEN"] if failed_tests == 0 else ["BOLD", "RED"])
+    
+    return failed_tests == 0
 
 def run_schema_validation_tests():
     """
@@ -119,5 +197,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     LOGGER.info(f"{args}")
     
+    # type_schemaの一致性テストを実行
+    type_schema_success = test_type_schema_consistency()
+    
     # スキーマ検証テストを実行
     run_schema_validation_tests()
+    
+    # type_schemaテストが失敗した場合は終了コードで知らせる
+    if not type_schema_success:
+        import sys
+        sys.exit(1)

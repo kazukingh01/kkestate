@@ -19,8 +19,8 @@ sys.path.insert(0, str(project_root))
 from kklogger import set_logger
 from kkpsgre.connector import DBConnector
 from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
-from kkestate.util.data_analyzer import analyze_key_and_data, get_sample_data
-from kkestate.util.key_processing_mapper import get_processing_info_for_key
+from kkestate.util.data_analyzer import get_sample_data
+from kkestate.util.key_mapper import get_processing_info_for_key
 from kkestate.util.json_cleaner import extract_period_from_key
 
 LOGGER = set_logger(__name__)
