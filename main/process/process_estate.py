@@ -23,6 +23,32 @@ from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
 from kkestate.util.key_mapper import get_processing_info_for_key
 from kkestate.util.json_cleaner import extract_period_from_key
 
+def parse_runid_range(x: str):
+    """
+    runid範囲指定を解析する
+    
+    Args:
+        x: 入力文字列（例: "123" または "1,1000"）
+        
+    Returns:
+        List[int]: run_idのリスト
+    """
+    parts = x.split(",")
+    
+    if len(parts) == 1:
+        # 単一指定
+        return [int(parts[0])]
+    elif len(parts) == 2:
+        # 範囲指定
+        start = int(parts[0])
+        end = int(parts[1])
+        if start > end:
+            raise ValueError(f"範囲指定が無効です: {start} > {end}")
+        return list(range(start, end + 1))
+    else:
+        # 3つ以上はエラー
+        raise ValueError(f"runid指定は単一（123）または範囲（1,1000）のみ対応しています。入力: {x}")
+
 LOGGER = set_logger(__name__)
 
 def get_sample_data(db, key_id: int, limit: Optional[int] = 100) -> list:
@@ -630,7 +656,7 @@ if __name__ == "__main__":
     parser.add_argument("--process", action='store_true', default=False, help='データクレンジング処理を実行')
     parser.add_argument("--batchsize", type=int, default=100, help='バッチ処理のサイズ（デフォルト: 100）')
     parser.add_argument("--stats", action='store_true', default=False, help='処理統計を表示')
-    parser.add_argument("--runid", type=int, help='特定のrun_idのみを処理')
+    parser.add_argument("--runid", type=lambda x: parse_runid_range(x), help='特定のrun_idのみを処理（範囲指定: 1,1000 で1から1000まで、単一指定: 123）')
     parser.add_argument("--verbose", action='store_true', default=False, help='詳細ログを出力')
     parser.add_argument("--all", action='store_true', default=False, help='全てのキーを処理（LIMITなし）')
     parser.add_argument("--keyid", type=lambda x: [int(y) for y in x.split(",")], help='特定のestate_mst_key.idのみを処理（複数指定時はカンマ区切り: 121,122,123）')
@@ -669,15 +695,28 @@ if __name__ == "__main__":
         # データクレンジング処理
         if args.process:
             if args.runid:
-                # 単一run_idの処理
+                # 指定run_idの処理（単一または範囲）
                 action = "処理" if args.update else "分析"
-                LOGGER.info(f"run_id {args.runid} の{action}を開始", color=["BOLD", "CYAN"])
-                success = process_single_run(db, args.runid, update_db=args.update)
-                if success:
-                    LOGGER.info(f"run_id {args.runid} の{action}が成功しました", color=["BOLD", "CYAN"])
+                run_ids = args.runid
+                LOGGER.info(f"指定run_id {len(run_ids)}件の{action}を開始: {run_ids[0]} - {run_ids[-1] if len(run_ids) > 1 else run_ids[0]}", color=["BOLD", "CYAN"])
+                
+                success_count = 0
+                failed_count = 0
+                
+                for i, run_id in enumerate(run_ids, 1):
+                    LOGGER.info(f"処理中 ({i}/{len(run_ids)}): run_id {run_id}")
+                    success = process_single_run(db, run_id, update_db=args.update)
+                    if success:
+                        success_count += 1
+                    else:
+                        failed_count += 1
+                
+                if failed_count == 0:
+                    LOGGER.info(f"指定run_idの{action}が完了しました: 成功={success_count}", color=["BOLD", "CYAN"])
                 else:
-                    LOGGER.error(f"run_id {args.runid} の{action}が失敗しました")
-                    sys.exit(1)
+                    LOGGER.error(f"指定run_idの{action}が完了しました: 成功={success_count}, 失敗={failed_count}")
+                    if success_count == 0:
+                        sys.exit(1)
             else:
                 # バッチ処理
                 action = "データクレンジング処理" if args.update else "データクレンジング分析"
