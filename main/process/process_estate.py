@@ -697,8 +697,27 @@ if __name__ == "__main__":
             if args.runid:
                 # 指定run_idの処理（単一または範囲）
                 action = "処理" if args.update else "分析"
-                run_ids = args.runid
-                LOGGER.info(f"指定run_id {len(run_ids)}件の{action}を開始: {run_ids[0]} - {run_ids[-1] if len(run_ids) > 1 else run_ids[0]}", color=["BOLD", "CYAN"])
+                requested_run_ids = args.runid
+                
+                # DBから存在するrun_idのみを取得
+                if requested_run_ids:
+                    run_ids_str = ','.join(map(str, requested_run_ids))
+                    check_sql = f"SELECT id FROM estate_run WHERE id IN ({run_ids_str}) AND is_success = true ORDER BY id"
+                    existing_df = db.select_sql(check_sql)
+                    run_ids = existing_df['id'].tolist() if not existing_df.empty else []
+                    
+                    # 存在しないrun_idがある場合は警告
+                    missing_ids = set(requested_run_ids) - set(run_ids)
+                    if missing_ids:
+                        LOGGER.warning(f"以下のrun_idは存在しないかis_success=falseです: {sorted(missing_ids)}")
+                    
+                    if not run_ids:
+                        LOGGER.error("処理対象のrun_idが存在しません")
+                        sys.exit(1)
+                else:
+                    run_ids = []
+                
+                LOGGER.info(f"存在する run_id {len(run_ids)}件の{action}を開始: {run_ids[0]} - {run_ids[-1] if len(run_ids) > 1 else run_ids[0]}", color=["BOLD", "CYAN"])
                 
                 success_count = 0
                 failed_count = 0
