@@ -709,14 +709,10 @@ if __name__ == "__main__":
                     if success:
                         success_count += 1
                     else:
-                        failed_count += 1
-                
-                if failed_count == 0:
-                    LOGGER.info(f"指定run_idの{action}が完了しました: 成功={success_count}", color=["BOLD", "CYAN"])
-                else:
-                    LOGGER.error(f"指定run_idの{action}が完了しました: 成功={success_count}, 失敗={failed_count}")
-                    if success_count == 0:
+                        LOGGER.error(f"run_id {run_id} の{action}が失敗しました. 処理を中止します")
                         sys.exit(1)
+                
+                LOGGER.info(f"指定run_idの{action}が完了しました: 成功={success_count}", color=["BOLD", "CYAN"])
             else:
                 # バッチ処理
                 action = "データクレンジング処理" if args.update else "データクレンジング分析"
