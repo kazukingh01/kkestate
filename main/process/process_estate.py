@@ -72,11 +72,9 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
             sql = f"SELECT id, name FROM estate_mst_key WHERE id = {specific_key_id}"
             LOGGER.info(f"特定キー(id={specific_key_id})のクレンジング済みキーマッピングの{action}を開始")
     else:
-        sql = "SELECT id, name FROM estate_mst_key WHERE id_cleaned IS NULL"
-        # --allフラグは特定キーが指定されていない場合は無視
-        if limit_all:
-            LOGGER.info("--allフラグは--keyidオプションと組み合わせて使用してください")
-        LOGGER.info(f"クレンジング済みキーマッピングの{action}を開始")
+        # keyidが指定されていない場合は全キー処理
+        sql = "SELECT id, name FROM estate_mst_key ORDER BY id"
+        LOGGER.info(f"全キーのクレンジング済みキーマッピングの{action}を開始")
     
     # キーデータを取得
     keys_df = db.select_sql(sql)
@@ -95,7 +93,10 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
         else:
             LOGGER.info(f"特定キー(id={specific_key_id})を処理します（サンプルデータLIMIT 100）")
     else:
-        LOGGER.info(f"{len(keys_df)}件のキーを処理します")
+        if limit_all:
+            LOGGER.info(f"全{len(keys_df)}件のキーを処理します（サンプルデータLIMIT 10000）")
+        else:
+            LOGGER.info(f"全{len(keys_df)}件のキーを処理します（サンプルデータLIMIT 100）")
     
     update_count = 0
     skip_count = 0
