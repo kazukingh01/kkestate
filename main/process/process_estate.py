@@ -464,7 +464,8 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
             if not cleaned_result.empty:
                 cleaned_name_map = dict(zip(cleaned_result['name'], cleaned_result['id']))
         
-        # 処理済みデータを順次保存
+        # 処理済みデータをログ出力とSQL準備
+        insert_sqls = []
         for detail in processed_details:
             key_id = detail['key_id']
             key_name = detail['key_name']
@@ -478,21 +479,26 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
                 LOGGER.warning(f"estate_mst_cleanedに'{cleaned_name}'が見つかりません")
                 continue
             
-            # estate_cleanedに保存（update_dbがTrueの場合のみ）
+            # ログ出力
             LOGGER.info(f"[CLEAN] run_id={run_id}, key_id={key_id}, key_name={key_name}, raw_value: {raw_value}, cleaned_value: {cleaned_value}")
+            
+            # SQLを準備（update_dbがTrueの場合のみ）
             if update_db:
                 # SQLインジェクション対策のため、文字列をエスケープ
                 escaped_value = json.dumps(cleaned_value, ensure_ascii=False).replace("'", "''")
                 
-                insert_sql = f"""
-                INSERT INTO estate_cleaned (id_run, id_key, id_cleaned, value_cleaned)
+                insert_sql = f"""INSERT INTO estate_cleaned (id_run, id_key, id_cleaned, value_cleaned)
                 VALUES ({run_id}, {key_id}, {cleaned_id}, '{escaped_value}')
                 ON CONFLICT (id_run, id_key) DO UPDATE SET
                     id_cleaned = EXCLUDED.id_cleaned,
-                    value_cleaned = EXCLUDED.value_cleaned
-                """
+                    value_cleaned = EXCLUDED.value_cleaned"""
                 
-                db.execute_sql(insert_sql)
+                insert_sqls.append(insert_sql)
+        
+        # 全てのINSERT文を1回のトランザクションで実行
+        if update_db and insert_sqls:
+            combined_sql = "; ".join(insert_sqls)
+            db.execute_sql(combined_sql)
         
         return True
         
