@@ -377,7 +377,7 @@ def get_unprocessed_runs(db: DBConnector, limit: int = 1000) -> List[int]:
     Returns:
         未処理のrun_idのリスト
     """
-    sql = """
+    sql = f"""
     SELECT r.id 
     FROM estate_run r 
     WHERE r.is_success = true 
@@ -385,10 +385,10 @@ def get_unprocessed_runs(db: DBConnector, limit: int = 1000) -> List[int]:
         SELECT 1 FROM estate_cleaned c WHERE c.id_run = r.id
     )
     ORDER BY r.id
-    LIMIT %s
+    LIMIT {limit}
     """
     
-    result_df = db.select_sql_with_params(sql, (limit,))
+    result_df = db.select_sql(sql)
     return result_df['id'].tolist() if not result_df.empty else []
 
 def get_run_details(db: DBConnector, run_id: int) -> List[Dict[str, Any]]:
@@ -402,17 +402,17 @@ def get_run_details(db: DBConnector, run_id: int) -> List[Dict[str, Any]]:
     Returns:
         データ詳細のリスト
     """
-    sql = """
+    sql = f"""
     SELECT ed.id_run, ed.id_key, ed.value, mk.name as key_name
     FROM estate_detail ed
     JOIN estate_mst_key mk ON ed.id_key = mk.id
-    WHERE ed.id_run = %s
+    WHERE ed.id_run = {run_id}
     """
     
-    result_df = db.select_sql_with_params(sql, (run_id,))
+    result_df = db.select_sql(sql)
     return result_df.to_dict('records') if not result_df.empty else []
 
-def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]]) -> bool:
+def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]], update_db: bool = True) -> bool:
     """
     クレンジング済みデータをestate_cleanedに保存する
     
@@ -420,11 +420,16 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
         db: データベースコネクター
         run_id: run_id
         details: 詳細データリスト
+        update_db: Trueの場合はDBを更新、Falseの場合は分析のみ
         
     Returns:
         保存成功フラグ
     """
     try:
+        # 全てのキーに対してクレンジング情報を事前取得
+        processed_details = []
+        cleaned_names = set()
+        
         for detail in details:
             key_id = detail['id_key']
             key_name = detail['key_name']
@@ -440,29 +445,54 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
             # クリーニング処理実行
             cleaned_value = clean_single_value_to_json(key_name, cleaned_name, raw_value, processing_function, type_schema)
             
-            # estate_mst_cleanedのidを取得
-            select_cleaned_sql = "SELECT id FROM estate_mst_cleaned WHERE name = %s"
-            cleaned_result = db.select_sql_with_params(select_cleaned_sql, (cleaned_name,))
+            processed_details.append({
+                'key_id': key_id,
+                'key_name': key_name,
+                'raw_value': raw_value,
+                'cleaned_name': cleaned_name,
+                'cleaned_value': cleaned_value
+            })
+            cleaned_names.add(cleaned_name)
+        
+        # estate_mst_cleanedのidを一括取得
+        cleaned_name_map = {}
+        if cleaned_names:
+            cleaned_names_str = "', '".join(cleaned_names)
+            select_cleaned_sql = f"SELECT id, name FROM estate_mst_cleaned WHERE name IN ('{cleaned_names_str}')"
+            cleaned_result = db.select_sql(select_cleaned_sql)
             
-            if cleaned_result.empty:
+            if not cleaned_result.empty:
+                cleaned_name_map = dict(zip(cleaned_result['name'], cleaned_result['id']))
+        
+        # 処理済みデータを順次保存
+        for detail in processed_details:
+            key_id = detail['key_id']
+            key_name = detail['key_name']
+            raw_value = detail['raw_value']
+            cleaned_name = detail['cleaned_name']
+            cleaned_value = detail['cleaned_value']
+            
+            # cleaned_idの取得
+            cleaned_id = cleaned_name_map.get(cleaned_name)
+            if cleaned_id is None:
                 LOGGER.warning(f"estate_mst_cleanedに'{cleaned_name}'が見つかりません")
                 continue
             
-            cleaned_id = cleaned_result.iloc[0]['id']
-            
-            # estate_cleanedに保存
-            # SQLインジェクション対策のため、文字列をエスケープ
-            escaped_value = json.dumps(cleaned_value, ensure_ascii=False).replace("'", "''")
-            
-            insert_sql = f"""
-            INSERT INTO estate_cleaned (id_run, id_key, id_cleaned, value_cleaned)
-            VALUES ({run_id}, {key_id}, {cleaned_id}, '{escaped_value}')
-            ON CONFLICT (id_run, id_key) DO UPDATE SET
-                id_cleaned = EXCLUDED.id_cleaned,
-                value_cleaned = EXCLUDED.value_cleaned
-            """
-            
-            db.execute_sql(insert_sql)
+            # estate_cleanedに保存（update_dbがTrueの場合のみ）
+            LOGGER.info(f"[CLEAN] run_id={run_id}, key_id={key_id}, key_name={key_name}, raw_value: {raw_value}, cleaned_value: {cleaned_value}")
+            if update_db:
+                # SQLインジェクション対策のため、文字列をエスケープ
+                escaped_value = json.dumps(cleaned_value, ensure_ascii=False).replace("'", "''")
+                
+                insert_sql = f"""
+                INSERT INTO estate_cleaned (id_run, id_key, id_cleaned, value_cleaned)
+                VALUES ({run_id}, {key_id}, {cleaned_id}, '{escaped_value}')
+                ON CONFLICT (id_run, id_key) DO UPDATE SET
+                    id_cleaned = EXCLUDED.id_cleaned,
+                    value_cleaned = EXCLUDED.value_cleaned
+                """
+                
+                db.execute_sql(insert_sql)
         
         return True
         
@@ -470,13 +500,14 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
         LOGGER.error(f"データ保存エラー (run_id={run_id}): {e}")
         return False
 
-def process_single_run(db: DBConnector, run_id: int) -> bool:
+def process_single_run(db: DBConnector, run_id: int, update_db: bool = True) -> bool:
     """
     単一のrun_idを処理する
     
     Args:
         db: データベースコネクター
         run_id: 処理するrun_id
+        update_db: Trueの場合はDBを更新、Falseの場合は分析のみ
         
     Returns:
         処理成功フラグ
@@ -490,7 +521,7 @@ def process_single_run(db: DBConnector, run_id: int) -> bool:
             return False
         
         # クレンジング・保存実行
-        success = save_cleaned_data(db, run_id, details)
+        success = save_cleaned_data(db, run_id, details, update_db)
         
         if success:
             LOGGER.info(f"run_id {run_id} の処理が完了しました ({len(details)}件)")
@@ -503,13 +534,14 @@ def process_single_run(db: DBConnector, run_id: int) -> bool:
         LOGGER.error(f"run_id {run_id} の処理中にエラーが発生しました: {e}")
         return False
 
-def process_batch(db: DBConnector, batch_size: int = 100) -> Dict[str, int]:
+def process_batch(db: DBConnector, batch_size: int = 100, update_db: bool = True) -> Dict[str, int]:
     """
     バッチ処理でデータクレンジングを実行する
     
     Args:
         db: データベースコネクター
         batch_size: バッチサイズ
+        update_db: Trueの場合はDBを更新、Falseの場合は分析のみ
         
     Returns:
         処理結果統計
@@ -529,7 +561,7 @@ def process_batch(db: DBConnector, batch_size: int = 100) -> Dict[str, int]:
         for i, run_id in enumerate(unprocessed_runs, 1):
             LOGGER.info(f"処理中 ({i}/{len(unprocessed_runs)}): run_id {run_id}")
             
-            if process_single_run(db, run_id):
+            if process_single_run(db, run_id, update_db):
                 success_count += 1
             else:
                 failed_count += 1
@@ -632,34 +664,28 @@ if __name__ == "__main__":
         if args.process:
             if args.runid:
                 # 単一run_idの処理
-                LOGGER.info(f"run_id {args.runid} の処理を開始", color=["BOLD", "CYAN"])
-                if args.update:
-                    success = process_single_run(db, args.runid)
-                    if success:
-                        LOGGER.info(f"run_id {args.runid} の処理が成功しました", color=["BOLD", "CYAN"])
-                    else:
-                        LOGGER.error(f"run_id {args.runid} の処理が失敗しました")
-                        sys.exit(1)
+                action = "処理" if args.update else "分析"
+                LOGGER.info(f"run_id {args.runid} の{action}を開始", color=["BOLD", "CYAN"])
+                success = process_single_run(db, args.runid, update_db=args.update)
+                if success:
+                    LOGGER.info(f"run_id {args.runid} の{action}が成功しました", color=["BOLD", "CYAN"])
                 else:
-                    LOGGER.info(f"run_id {args.runid} の分析のみ実行（未実装）", color=["BOLD", "YELLOW"])
-                    LOGGER.warning("分析のみの処理は未実装です")
+                    LOGGER.error(f"run_id {args.runid} の{action}が失敗しました")
+                    sys.exit(1)
             else:
                 # バッチ処理
-                if args.update:
-                    LOGGER.info("データクレンジング処理を開始", color=["BOLD", "GREEN"])
-                    result = process_batch(db, args.batchsize)
-                    
-                    if result['total'] == 0:
-                        LOGGER.warning("処理対象のデータがありません")
-                    else:
-                        success_rate = (result['success'] / result['total']) * 100
-                        LOGGER.info(f"処理完了: {result['success']}/{result['total']} ({success_rate:.1f}%)", color=["BOLD", "GREEN"])
-                        
-                        if result['failed'] > 0:
-                            LOGGER.warning(f"失敗した処理: {result['failed']}件")
+                action = "データクレンジング処理" if args.update else "データクレンジング分析"
+                LOGGER.info(f"{action}を開始", color=["BOLD", "GREEN"])
+                result = process_batch(db, args.batchsize, update_db=args.update)
+                
+                if result['total'] == 0:
+                    LOGGER.warning("処理対象のデータがありません")
                 else:
-                    LOGGER.info("バッチ分析のみ実行（未実装）", color=["BOLD", "YELLOW"])
-                    LOGGER.warning("分析のみの処理は未実装です")
+                    success_rate = (result['success'] / result['total']) * 100
+                    LOGGER.info(f"{action}完了: {result['success']}/{result['total']} ({success_rate:.1f}%)", color=["BOLD", "GREEN"])
+                    
+                    if result['failed'] > 0:
+                        LOGGER.warning(f"失敗した{action}: {result['failed']}件")
         
         # 処理が何も指定されていない場合のメッセージは表示しない
         # （デフォルトで分析が実行されるため）
