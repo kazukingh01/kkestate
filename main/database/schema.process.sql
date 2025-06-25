@@ -42,3 +42,21 @@ CREATE INDEX IF NOT EXISTS idx_estate_cleaned_run ON estate_cleaned(id_run);
 CREATE INDEX IF NOT EXISTS idx_estate_cleaned_key ON estate_cleaned(id_key);
 CREATE INDEX IF NOT EXISTS idx_estate_cleaned_cleaned ON estate_cleaned(id_cleaned);
 CREATE INDEX IF NOT EXISTS idx_estate_cleaned_run_cleaned ON estate_cleaned(id_run, id_cleaned);
+
+-- estate_detail_refテーブル: データ参照関係管理
+-- 各run_idの各keyに対して、実際のデータがどのrun_idを参照しているかを管理
+CREATE TABLE IF NOT EXISTS estate_detail_ref (
+    id_run BIGINT NOT NULL,
+    id_key SMALLINT NOT NULL,
+    id_run_ref BIGINT NOT NULL,
+    PRIMARY KEY (id_run, id_key),
+    FOREIGN KEY (id_run) REFERENCES estate_run(id),
+    FOREIGN KEY (id_key) REFERENCES estate_mst_key(id),
+    FOREIGN KEY (id_run_ref) REFERENCES estate_run(id)
+);
+
+-- 検索用インデックス
+CREATE INDEX IF NOT EXISTS idx_estate_detail_ref_run ON estate_detail_ref(id_run);
+CREATE INDEX IF NOT EXISTS idx_estate_detail_ref_key ON estate_detail_ref(id_key);
+CREATE INDEX IF NOT EXISTS idx_estate_detail_ref_run_ref ON estate_detail_ref(id_run_ref);
+CREATE INDEX IF NOT EXISTS idx_estate_detail_ref_run_key ON estate_detail_ref(id_run, id_key);
