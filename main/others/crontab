@@ -15,3 +15,4 @@ PATH=/home/ubuntu/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sb
 */10 *   8,18,28 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
 */10 *   9,19,29 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
 0    0   *       * * ubuntu  ${PYTHONPATH}/kklogrm --rm --path ${DIRBASE}/main/log/\*YYYYMMDD.log --fr 20010101 --to `date "+\%Y\%m\%d" --date '31 day ago'`
+*/10 *   *       * * ubuntu  ${PYTHONPATH}/python ${DIRBASE}/main/others/process_kill.py "suumo.py" -c 0.01 -d 600 -i 1 -k
