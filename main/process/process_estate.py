@@ -74,14 +74,15 @@ def get_sample_data(db, key_id: int, limit: Optional[int] = 100) -> list:
     except Exception:
         return []
 
-def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool = False, specific_key_id: Optional[Union[int, List[int]]] = None):
+def update_key_mapping(db: DBConnector, update_db: bool = False, sample_size: int = 100, unique_display: bool = False, specific_key_id: Optional[Union[int, List[int]]] = None):
     """
     estate_mst_keyとestate_mst_cleanedのマッピングを分析・更新する
     
     Args:
         db: データベースコネクター
         update_db: Trueの場合はDBを更新、Falseの場合は分析のみ
-        limit_all: Trueの場合は全てのキーを処理（LIMITなし）
+        sample_size: サンプルデータ件数
+        unique_display: 重複を除去して件数付きで表示するか
         specific_key_id: 指定された場合は特定のestate_mst_key.idのみを処理
     """
     action = "更新" if update_db else "分析"
@@ -114,15 +115,9 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
     
     # 処理対象の説明
     if specific_key_id:
-        if limit_all:
-            LOGGER.info(f"特定キー(id={specific_key_id})を処理します（サンプルデータLIMIT 10000）")
-        else:
-            LOGGER.info(f"特定キー(id={specific_key_id})を処理します（サンプルデータLIMIT 100）")
+        LOGGER.info(f"特定キー(id={specific_key_id})を処理します（サンプルデータ{sample_size}件）")
     else:
-        if limit_all:
-            LOGGER.info(f"全{len(keys_df)}件のキーを処理します（サンプルデータLIMIT 10000）")
-        else:
-            LOGGER.info(f"全{len(keys_df)}件のキーを処理します（サンプルデータLIMIT 100）")
+        LOGGER.info(f"全{len(keys_df)}件のキーを処理します（サンプルデータ{sample_size}件）")
     
     update_count = 0
     skip_count = 0
@@ -135,12 +130,7 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
         LOGGER.info(f"処理中: id={key_id}, name='{raw_name}'")
         
         # このキーのサンプルデータを取得
-        if specific_key_id and limit_all:
-            # 特定キー指定時の--allフラグ: LIMITなし
-            sample_values = get_sample_data(db, key_id, limit=None)
-        else:
-            # デフォルト: LIMIT 100
-            sample_values = get_sample_data(db, key_id, limit=100)
+        sample_values = get_sample_data(db, key_id, limit=sample_size)
         
         # key_processing_mapperを使用してクレンジング済み項目名と型スキーマを決定
         cleaned_name, processing_function, type_schema = get_processing_info_for_key(raw_name)
@@ -156,8 +146,8 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
             # サンプルデータで実際の変換を実行して表示
             transformation_examples = []
             
-            if specific_key_id and limit_all:
-                # --allフラグ使用時は重複を除いて件数付きで表示
+            if unique_display:
+                # --uniqueフラグ使用時は重複を除いて件数付きで表示
                 import pandas as pd
                 
                 # サンプルデータをDataFrameに変換
@@ -225,8 +215,8 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
         # サンプルデータで実際の変換を実行して表示
         transformation_examples = []
         
-        if specific_key_id and limit_all:
-            # --allフラグ使用時は重複を除いて件数付きで表示
+        if unique_display:
+            # --uniqueフラグ使用時は重複を除いて件数付きで表示
             import pandas as pd
             
             # サンプルデータをDataFrameに変換
@@ -407,6 +397,9 @@ def get_unprocessed_runs(db: DBConnector, limit: int = 1000) -> List[int]:
     SELECT r.id 
     FROM estate_run r 
     WHERE r.is_success = true 
+    AND EXISTS (
+        SELECT 1 FROM estate_detail d WHERE d.id_run = r.id LIMIT 1
+    )
     AND NOT EXISTS (
         SELECT 1 FROM estate_cleaned c WHERE c.id_run = r.id
     )
@@ -549,8 +542,8 @@ def process_single_run(db: DBConnector, run_id: int, update_db: bool = True) -> 
         details = get_run_details(db, run_id)
         
         if not details:
-            LOGGER.warning(f"run_id {run_id} のデータが見つかりません")
-            return False
+            LOGGER.warning(f"run_id {run_id} のデータが見つかりません（前回と同一データのため省略済み）")
+            return True
         
         # クレンジング・保存実行
         success = save_cleaned_data(db, run_id, details, update_db)
@@ -650,21 +643,74 @@ def get_processing_stats(db: DBConnector) -> Dict[str, int]:
         return {'total_runs': 0, 'processed_runs': 0, 'unprocessed_runs': 0, 'progress_percent': 0}
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='不動産データ処理ツール')
-    parser.add_argument("--update", action='store_true', default=False, help='データベース更新処理を実行')
-    parser.add_argument("--mapping", action='store_true', default=False, help='キーマッピング処理を実行')
-    parser.add_argument("--process", action='store_true', default=False, help='データクレンジング処理を実行')
-    parser.add_argument("--batchsize", type=int, default=100, help='バッチ処理のサイズ（デフォルト: 100）')
-    parser.add_argument("--stats", action='store_true', default=False, help='処理統計を表示')
-    parser.add_argument("--runid", type=lambda x: parse_runid_range(x), help='特定のrun_idのみを処理（範囲指定: 1,1000 で1から1000まで、単一指定: 123）')
-    parser.add_argument("--verbose", action='store_true', default=False, help='詳細ログを出力')
-    parser.add_argument("--all", action='store_true', default=False, help='全てのキーを処理（LIMITなし）')
-    parser.add_argument("--keyid", type=lambda x: [int(y) for y in x.split(",")], help='特定のestate_mst_key.idのみを処理（複数指定時はカンマ区切り: 121,122,123）')
+    parser = argparse.ArgumentParser(
+        description='不動産データ処理ツール',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+実行例:
+  # キーマッピング処理
+  python process_estate.py mapping                    # 分析のみ（サンプル100件）
+  python process_estate.py mapping --update           # DB更新あり
+  python process_estate.py mapping --sample 1000      # サンプル1000件で分析
+  python process_estate.py mapping --sample 10000 --unique  # サンプル最大10000件で重複除去分析
+  python process_estate.py mapping --sample 500 --unique    # サンプル500件で重複除去分析
+  python process_estate.py mapping --keyid 121,122    # 特定キー対象
+  
+  # データクレンジング処理
+  python process_estate.py process                   # 分析のみ（バッチ100件）
+  python process_estate.py process --update          # DB更新あり
+  python process_estate.py process --runid 1000      # 特定run_id処理
+  python process_estate.py process --runid 1,1000    # 範囲指定（1～1000）
+  python process_estate.py process --batchsize 500   # バッチサイズ変更
+  
+  # 統計情報表示
+  python process_estate.py stats                     # 処理統計を表示
+'''
+    )
+    
+    # サブコマンドを追加
+    subparsers = parser.add_subparsers(dest='command', help='実行する処理')
+    
+    # mappingサブコマンド
+    mapping_parser = subparsers.add_parser('mapping', help='キーマッピング処理')
+    mapping_parser.add_argument("--update", action='store_true', default=False, help='データベース更新処理を実行')
+    mapping_parser.add_argument("--sample", type=int, default=100, help='サンプルデータ件数（1-10000、デフォルト: 100）')
+    mapping_parser.add_argument("--unique", action='store_true', default=False, help='重複を除去して件数付きで表示')
+    mapping_parser.add_argument("--keyid", type=lambda x: [int(y) for y in x.split(",")], help='特定のestate_mst_key.idのみを処理（複数指定時はカンマ区切り: 121,122,123）')
+    
+    # processサブコマンド
+    process_parser = subparsers.add_parser('process', help='データクレンジング処理')
+    process_parser.add_argument("--update", action='store_true', default=False, help='データベース更新処理を実行')
+    process_parser.add_argument("--batchsize", type=int, default=100, help='バッチ処理のサイズ（デフォルト: 100）')
+    process_parser.add_argument("--runid", type=lambda x: parse_runid_range(x), help='特定のrun_idのみを処理（範囲指定: 1,1000 で1から1000まで、単一指定: 123）')
+    
+    # statsサブコマンド
+    stats_parser = subparsers.add_parser('stats', help='処理統計を表示')
     
     args = parser.parse_args()
     
-    if args.keyid:
+    # コマンドが指定されていない場合はエラー
+    if args.command is None:
+        parser.print_help()
+        LOGGER.error("実行する処理を指定してください（mapping, process, stats）")
+        sys.exit(1)
+    
+    # サンプル件数の検証
+    if hasattr(args, 'sample') and (args.sample < 1 or args.sample > 10000):
+        LOGGER.error(f"--sample は 1 から 10000 の範囲で指定してください（指定値: {args.sample}）")
+        sys.exit(1)
+    
+    # processサブコマンドの引数競合チェック
+    if args.command == 'process' and hasattr(args, 'runid') and args.runid and hasattr(args, 'batchsize') and args.batchsize != 100:
+        LOGGER.error("--runid と --batchsize は同時に指定できません（--runidは個別処理、--batchsizeは自動バッチ処理用）")
+        sys.exit(1)
+    
+    if hasattr(args, 'keyid') and args.keyid:
         LOGGER.info(f"対象keyid: {args.keyid}")
+    if hasattr(args, 'sample'):
+        LOGGER.info(f"サンプル件数: {args.sample}")
+    if hasattr(args, 'unique') and args.unique:
+        LOGGER.info("重複除去モード: ON")
     
     LOGGER.info(f"{args}")
     
@@ -672,19 +718,20 @@ if __name__ == "__main__":
         # データベース接続
         db = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE)
         
-        # キーマッピング処理
-        if args.mapping:
+        # サブコマンドに基づく処理分岐
+        if args.command == 'mapping':
+            # キーマッピング処理
             if args.update:
                 LOGGER.info("キーマッピング分析・更新を開始", color=["BOLD", "GREEN"])
-                update_key_mapping(db, update_db=True, limit_all=args.all, specific_key_id=args.keyid)
+                update_key_mapping(db, update_db=True, sample_size=args.sample, unique_display=args.unique, specific_key_id=args.keyid)
                 LOGGER.info("キーマッピング分析・更新が完了しました", color=["BOLD", "GREEN"])
             else:
                 LOGGER.info("キーマッピング分析を開始（更新なし）", color=["BOLD", "GREEN"])
-                update_key_mapping(db, update_db=False, limit_all=args.all, specific_key_id=args.keyid)
+                update_key_mapping(db, update_db=False, sample_size=args.sample, unique_display=args.unique, specific_key_id=args.keyid)
                 LOGGER.info("キーマッピング分析が完了しました", color=["BOLD", "GREEN"])
         
-        # 統計表示
-        if args.stats:
+        elif args.command == 'stats':
+            # 統計表示
             stats = get_processing_stats(db)
             LOGGER.info("=== 処理統計 ===")
             LOGGER.info(f"成功したRUN総数: {stats['total_runs']:,}")
@@ -692,8 +739,8 @@ if __name__ == "__main__":
             LOGGER.info(f"未処理RUN数: {stats['unprocessed_runs']:,}")
             LOGGER.info(f"処理進捗: {stats['progress_percent']:.1f}%")
         
-        # データクレンジング処理
-        if args.process:
+        elif args.command == 'process':
+            # データクレンジング処理
             if args.runid:
                 # 指定run_idの処理（単一または範囲）
                 action = "処理" if args.update else "分析"
@@ -755,7 +802,6 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         LOGGER.error(f"予期しないエラーが発生しました: {e}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
