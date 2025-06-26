@@ -13,6 +13,7 @@ dependencies = [
     'requests==2.32.3',
     'beautifulsoup4==4.12.3',
     'joblib==1.4.2',
+    'psutil==7.0.0',
 ]
 
 [build-system]
