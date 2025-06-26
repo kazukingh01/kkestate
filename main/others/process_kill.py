@@ -73,8 +73,8 @@ def monitor_and_kill(pid, duration, interval, cpu_thresh, flg_kill: bool=False):
         time.sleep(interval)
 
     if hang_count == checks:
+        print(f"[PID {pid}] ハング判定 → kill 対象")
         if flg_kill:
-            print(f"[PID {pid}] ハング判定 → kill 実行")
             try:
                 p.kill()
                 print(f"[PID {pid}] kill 完了")
