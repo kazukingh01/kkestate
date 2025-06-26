@@ -4,8 +4,8 @@ DIRBASE=/home/ubuntu/kkestate
 PATH=/home/ubuntu/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 0    0   1,11,21 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 1
-0    0   2,12,22 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 2
-0    12  2,12,22 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 2
+*/10 *   1,11,21 * * ubuntu  sleep 60 && ! pgrep -f "suumo.py --updateurls" && bash ${DIRBASE}/main/collect/monitor.sh 2
+*/10 *   2,12,22 * * ubuntu  sleep 60 && ! pgrep -f "suumo.py --updateurls" && bash ${DIRBASE}/main/collect/monitor.sh 2
 */10 *   2,12,22 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
 */10 *   3,13,23 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
 */10 *   4,14,24 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3

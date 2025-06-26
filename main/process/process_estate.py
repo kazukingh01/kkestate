@@ -294,8 +294,8 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, limit_all: bool
                     cleaned_id = result[0][0]
                 else:
                     # ON CONFLICTで既存レコードがアップデートされた場合、idを取得
-                    select_cleaned_id_sql = "SELECT id FROM estate_mst_cleaned WHERE name = %s"
-                    cleaned_result = db.select_sql_with_params(select_cleaned_id_sql, (cleaned_name,))
+                    select_cleaned_id_sql = f"SELECT id FROM estate_mst_cleaned WHERE name = '{cleaned_name}'"
+                    cleaned_result = db.select_sql(select_cleaned_id_sql)
                     if not cleaned_result.empty:
                         cleaned_id = cleaned_result.iloc[0]['id']
                     else:
