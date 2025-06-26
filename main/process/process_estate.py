@@ -87,6 +87,12 @@ def update_key_mapping(db: DBConnector, update_db: bool = False, sample_size: in
     """
     action = "更新" if update_db else "分析"
     
+    # 全件処理の場合は最初に全てのid_cleanedをNULLに初期化
+    if update_db and specific_key_id is None:
+        LOGGER.info("全件更新のため、estate_mst_key.id_cleanedを全てNULLに初期化します")
+        db.execute_sql("UPDATE estate_mst_key SET id_cleaned = NULL")
+        LOGGER.info("id_cleaned初期化完了")
+    
     # クエリ条件を構築
     if specific_key_id:
         if isinstance(specific_key_id, list):
@@ -522,9 +528,14 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
                 insert_sqls.append(insert_sql)
         
         # 全てのINSERT文を1回のトランザクションで実行
+        LOGGER.info(f"[DEBUG] update_db={update_db}, insert_sqls数={len(insert_sqls)}")
         if update_db and insert_sqls:
             combined_sql = "; ".join(insert_sqls)
+            LOGGER.info(f"[DEBUG] SQL実行開始: {len(insert_sqls)}件のINSERT")
             db.execute_sql(combined_sql)
+            LOGGER.info(f"[DEBUG] SQL実行完了")
+        elif update_db and not insert_sqls:
+            LOGGER.warning(f"[DEBUG] update_db=Trueだが、insert_sqlsが空です")
         
         return True
         
