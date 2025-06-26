@@ -65,7 +65,7 @@ def monitor_and_kill(pid, duration, interval, cpu_thresh, flg_kill: bool=False):
         cpu = p.cpu_percent(interval=interval)
         status = p.status()  # e.g. 'running'／'disk-sleep'
         print(f"[{i}/{checks}] CPU={cpu:.2f}% | status={status}")
-        if status == psutil.STATUS_DISK_SLEEP and cpu < cpu_thresh:
+        if cpu < cpu_thresh:
             hang_count += 1
         else:
             print(f"[PID {pid}] 正常応答あり → kill 中止")
