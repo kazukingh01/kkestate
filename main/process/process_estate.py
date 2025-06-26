@@ -410,22 +410,29 @@ def get_unprocessed_runs(db: DBConnector, limit: int = 1000) -> List[int]:
     result_df = db.select_sql(sql)
     return result_df['id'].tolist() if not result_df.empty else []
 
-def get_run_details(db: DBConnector, run_id: int) -> List[Dict[str, Any]]:
+def get_run_details(db: DBConnector, run_id: int, target_key_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
     """
     指定されたrun_idの詳細データを取得する
     
     Args:
         db: データベースコネクター
         run_id: 取得するrun_id
+        target_key_ids: 特定のkey_idのみ取得する場合に指定
         
     Returns:
         データ詳細のリスト
     """
+    # key_id条件の構築
+    key_condition = ""
+    if target_key_ids:
+        key_ids_str = ','.join(map(str, target_key_ids))
+        key_condition = f"AND ed.id_key IN ({key_ids_str})"
+    
     sql = f"""
     SELECT ed.id_run, ed.id_key, ed.value, mk.name as key_name
     FROM estate_detail ed
     JOIN estate_mst_key mk ON ed.id_key = mk.id
-    WHERE ed.id_run = {run_id}
+    WHERE ed.id_run = {run_id} {key_condition}
     """
     
     result_df = db.select_sql(sql)
@@ -525,7 +532,7 @@ def save_cleaned_data(db: DBConnector, run_id: int, details: List[Dict[str, Any]
         LOGGER.error(f"データ保存エラー (run_id={run_id}): {e}")
         return False
 
-def process_single_run(db: DBConnector, run_id: int, update_db: bool = True) -> bool:
+def process_single_run(db: DBConnector, run_id: int, update_db: bool = True, target_key_ids: Optional[List[int]] = None) -> bool:
     """
     単一のrun_idを処理する
     
@@ -533,13 +540,20 @@ def process_single_run(db: DBConnector, run_id: int, update_db: bool = True) -> 
         db: データベースコネクター
         run_id: 処理するrun_id
         update_db: Trueの場合はDBを更新、Falseの場合は分析のみ
+        target_key_ids: 特定のkey_idのみ処理する場合に指定
         
     Returns:
         処理成功フラグ
     """
     try:
+        # target_key_idsが指定されていない場合のみ、既存のestate_cleanedデータを削除
+        if update_db and target_key_ids is None:
+            delete_sql = f"DELETE FROM estate_cleaned WHERE id_run = {run_id}"
+            db.execute_sql(delete_sql)
+            LOGGER.info(f"run_id {run_id} の既存クレンジングデータを削除しました")
+        
         # run詳細データを取得
-        details = get_run_details(db, run_id)
+        details = get_run_details(db, run_id, target_key_ids)
         
         if not details:
             LOGGER.warning(f"run_id {run_id} のデータが見つかりません（前回と同一データのため省略済み）")
@@ -661,6 +675,8 @@ if __name__ == "__main__":
   python process_estate.py process --update          # DB更新あり
   python process_estate.py process --runid 1000      # 特定run_id処理
   python process_estate.py process --runid 1,1000    # 範囲指定（1～1000）
+  python process_estate.py process --keyid 123 --runid 1000 --update        # 特定key_id+run_id再クレンジング
+  python process_estate.py process --keyid 123,124 --runid 1,1000 --update  # 特定key_id+run_id範囲
   python process_estate.py process --batchsize 500   # バッチサイズ変更
   
   # 統計情報表示
@@ -683,6 +699,7 @@ if __name__ == "__main__":
     process_parser.add_argument("--update", action='store_true', default=False, help='データベース更新処理を実行')
     process_parser.add_argument("--batchsize", type=int, default=100, help='バッチ処理のサイズ（デフォルト: 100）')
     process_parser.add_argument("--runid", type=lambda x: parse_runid_range(x), help='特定のrun_idのみを処理（範囲指定: 1,1000 で1から1000まで、単一指定: 123）')
+    process_parser.add_argument('--keyid', type=parse_runid_range, help='特定のkey_idのみ処理（例: 123 または 120,125）')
     
     # statsサブコマンド
     stats_parser = subparsers.add_parser('stats', help='処理統計を表示')
@@ -703,6 +720,14 @@ if __name__ == "__main__":
     # processサブコマンドの引数競合チェック
     if args.command == 'process' and hasattr(args, 'runid') and args.runid and hasattr(args, 'batchsize') and args.batchsize != 100:
         LOGGER.error("--runid と --batchsize は同時に指定できません（--runidは個別処理、--batchsizeは自動バッチ処理用）")
+        sys.exit(1)
+    
+    if args.command == 'process' and hasattr(args, 'keyid') and args.keyid and hasattr(args, 'batchsize') and args.batchsize != 100:
+        LOGGER.error("--keyid と --batchsize は同時に指定できません（--keyidは特定キー処理、--batchsizeは自動バッチ処理用）")
+        sys.exit(1)
+    
+    if args.command == 'process' and hasattr(args, 'keyid') and args.keyid and (not hasattr(args, 'runid') or not args.runid):
+        LOGGER.error("--keyid を指定する場合は --runid も必須です（特定のrun_idに対してkey_idを再処理）")
         sys.exit(1)
     
     if hasattr(args, 'keyid') and args.keyid:
@@ -741,6 +766,8 @@ if __name__ == "__main__":
         
         elif args.command == 'process':
             # データクレンジング処理
+            target_key_ids = args.keyid if hasattr(args, 'keyid') and args.keyid else None
+            
             if args.runid:
                 # 指定run_idの処理（単一または範囲）
                 action = "処理" if args.update else "分析"
@@ -771,7 +798,7 @@ if __name__ == "__main__":
                 
                 for i, run_id in enumerate(run_ids, 1):
                     LOGGER.info(f"処理中 ({i}/{len(run_ids)}): run_id {run_id}")
-                    success = process_single_run(db, run_id, update_db=args.update)
+                    success = process_single_run(db, run_id, update_db=args.update, target_key_ids=target_key_ids)
                     if success:
                         success_count += 1
                     else:
