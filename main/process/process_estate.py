@@ -404,7 +404,10 @@ def get_unprocessed_runs(db: DBConnector, limit: int = 1000) -> List[int]:
     FROM estate_run r 
     WHERE r.is_success = true 
     AND EXISTS (
-        SELECT 1 FROM estate_detail d WHERE d.id_run = r.id LIMIT 1
+        SELECT 1 FROM estate_detail d 
+        JOIN estate_mst_key k ON d.id_key = k.id 
+        WHERE d.id_run = r.id AND k.id_cleaned IS NOT NULL 
+        LIMIT 1
     )
     AND NOT EXISTS (
         SELECT 1 FROM estate_cleaned c WHERE c.id_run = r.id
