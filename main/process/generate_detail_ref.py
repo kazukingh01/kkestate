@@ -162,12 +162,11 @@ def save_reference_data(db: DBConnector, ref_data: pd.DataFrame, update: bool = 
     if len(ref_data) > 0:
         target_run_id = ref_data['id_run'].iloc[0]
         delete_sql = f"DELETE FROM estate_detail_ref WHERE id_run = {target_run_id}"
-        db.execute_sql(delete_sql)
-        LOGGER.info(f"既存データを削除: run_id={target_run_id}")
-    
-    # 新規データの保存
-    db.insert_from_df(ref_data, "estate_detail_ref", is_select=True)
-    LOGGER.info(f"estate_detail_refテーブルに保存完了: {len(ref_data)}件", color=["BOLD", "GREEN"])
+        db.set_sql(delete_sql)
+        db.insert_from_df(ref_data, "estate_detail_ref", is_select=True, set_sql=True)
+        db.execute_sql()
+        # 新規データの保存
+        LOGGER.info(f"estate_detail_refテーブルに保存完了: run_id={target_run_id}, {len(ref_data)}件", color=["BOLD", "GREEN"])
 
 def process_run_id(db: DBConnector, run_id: int, months_back: int = 6, update: bool = False) -> None:
     """
@@ -323,13 +322,11 @@ def process_multiple_runs(db: DBConnector, run_ids: list = None, recent_months: 
             
             # 単一run_idの既存データ削除・保存
             if update:
-                # 既存データ削除
-                delete_sql = f"DELETE FROM estate_detail_ref WHERE id_run = {run_id}"
-                db.execute_sql(delete_sql)
-                
-                # 新規データ保存
                 if not ref_data.empty:
-                    db.insert_from_df(ref_data, "estate_detail_ref", is_select=True)
+                    delete_sql = f"DELETE FROM estate_detail_ref WHERE id_run = {run_id}"
+                    db.set_sql(delete_sql)
+                    db.insert_from_df(ref_data, "estate_detail_ref", is_select=True, set_sql=True)
+                    db.execute_sql()
                     LOGGER.info(f"run_id={run_id}: {len(ref_data)}件の参照関係を保存", color=["BOLD", "GREEN"])
                 else:
                     LOGGER.info(f"run_id={run_id}: 保存するデータなし")
