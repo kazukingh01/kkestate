@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 不動産データ処理のメインスクリプト
 コマンドライン引数でオプションを指定して実行
@@ -12,14 +11,9 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 
-# プロジェクトルートをパスに追加
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
 from kklogger import set_logger
 from kkpsgre.connector import DBConnector
 from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
-# get_sample_data function moved here from util/data_analyzer.py
 from kkestate.util.key_mapper import get_processing_info_for_key
 from kkestate.util.json_cleaner import extract_period_from_key
 

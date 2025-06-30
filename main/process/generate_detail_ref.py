@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 データ参照関係生成処理 (generate_detail_ref.py)
 
