@@ -4,7 +4,7 @@ test_schema_validation.py - estate_mst_cleaned/type のスキーマ検証テス�
 
 import argparse
 from kklogger import set_logger
-from .MST import TEST_MAPPING, EXPECTED_KEY_PROCESSING
+from kkestate.test.testcases import TEST_MAPPING, EXPECTED_KEY_PROCESSING
 from kkestate.util.key_mapper import get_processing_info_for_key
 from kkestate.master.json_schemas import SCHEMAS
 

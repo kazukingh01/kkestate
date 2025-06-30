@@ -4,7 +4,7 @@ test_json_cleansing.py - JSON クレンジング機能のテスト
 
 import argparse
 from kklogger import set_logger
-from .MST import TEST_MAPPING
+from kkestate.test.testcases import TEST_MAPPING
 
 LOGGER = set_logger(__name__)
 

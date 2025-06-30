@@ -1,7 +1,8 @@
 import argparse
 from kklogger import set_logger
 from kkestate.util.key_mapper import get_processing_info_for_key
-from .MST import EXPECTED_KEY_PROCESSING
+from kkestate.test.testcases import EXPECTED_KEY_PROCESSING
+
 LOGGER = set_logger(__name__)
 
 
