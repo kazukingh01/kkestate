@@ -210,11 +210,12 @@ def get_target_runs_info(db: DBConnector, run_ids: list = None, recent_months: i
     """
     if run_ids:
         # 範囲指定処理
-        run_ids_str = ",".join(map(str, run_ids))
+        min_id = min(run_ids)
+        max_id = max(run_ids)
         sql = f"""
         SELECT id as id_run, id_main, timestamp
         FROM estate_run
-        WHERE id IN ({run_ids_str})
+        WHERE id BETWEEN {min_id} AND {max_id}
           AND is_success = true
         ORDER BY id DESC
         """
@@ -267,10 +268,11 @@ def process_multiple_runs(db: DBConnector, run_ids: list = None, recent_months: 
     
     # 範囲指定時の既存データ削除
     if run_ids and update:
-        run_ids_str = ",".join(map(str, run_ids))
-        delete_sql = f"DELETE FROM estate_detail_ref WHERE id_run IN ({run_ids_str})"
+        min_id = min(run_ids)
+        max_id = max(run_ids)
+        delete_sql = f"DELETE FROM estate_detail_ref WHERE id_run BETWEEN {min_id} AND {max_id}"
         db.execute_sql(delete_sql)
-        LOGGER.info(f"既存データを一括削除: {len(run_ids)}件")
+        LOGGER.info(f"既存データを一括削除: run_id {min_id} ～ {max_id}")
     
     LOGGER.info(f"処理対象のrun_id: {len(target_runs_df)}件")
     
@@ -337,53 +339,98 @@ def process_multiple_runs(db: DBConnector, run_ids: list = None, recent_months: 
             LOGGER.error(f"run_id={run_row['id_run']} の処理でエラー: {e}", color=["BOLD", "RED"])
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="データ参照関係生成処理")
-    parser.add_argument("--runid", type=str, help="処理対象のrun_id（単一: 123、範囲: 1,1000）（指定しない場合は未処理分を自動処理）")
-    parser.add_argument("--recent", type=int, help="過去X ヶ月以内のrun_idを処理対象とする（例: 3で過去3ヶ月）")
-    parser.add_argument("--limit", type=int, default=100, help="一度に処理するrun数の上限（デフォルト: 100）")
-    parser.add_argument("--months", type=int, default=6, help="過去何ヶ月分のデータを取得するか（デフォルト: 6）")
-    parser.add_argument("--update", action='store_true', default=False, help="データベースに実際に保存する")
-    parser.add_argument("--stats", action='store_true', default=False, help="統計情報を表示")
+    parser = argparse.ArgumentParser(
+        description="データ参照関係生成処理",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+実行例:
+  # 統計情報表示
+  python generate_detail_ref.py stats
+  
+  # データ参照関係処理
+  python generate_detail_ref.py process --runid 123456 --update
+  python generate_detail_ref.py process --runid 123,456 --update      # 範囲指定
+  python generate_detail_ref.py process --update                       # 未処理分100件まで
+  python generate_detail_ref.py process --update --limit 500          # 未処理分500件まで
+  python generate_detail_ref.py process --recent 3 --update           # 過去3ヶ月分
+  python generate_detail_ref.py process --recent 1 --limit 200 --update  # 過去1ヶ月、200件まで
+  python generate_detail_ref.py process --runid 123456 --months 12 --update  # 過去12ヶ月分を参照
+  
+  # 分析のみ（更新なし）
+  python generate_detail_ref.py process --runid 123456                # 分析のみ
+  python generate_detail_ref.py process --recent 1                    # 過去1ヶ月分を分析のみ
+'''
+    )
+    
+    # サブコマンドを追加
+    subparsers = parser.add_subparsers(dest='command', help='実行する処理')
+    
+    # processサブコマンド
+    process_parser = subparsers.add_parser('process', help='データ参照関係生成処理')
+    process_parser.add_argument("--runid", type=str, help="処理対象のrun_id（単一: 123、範囲: 1,1000）（指定しない場合は未処理分を自動処理）")
+    process_parser.add_argument("--recent", type=int, help="過去X ヶ月以内のrun_idを処理対象とする（例: 3で過去3ヶ月）")
+    process_parser.add_argument("--limit", type=int, default=100, help="一度に処理するrun数の上限（デフォルト: 100）")
+    process_parser.add_argument("--months", type=int, default=6, help="過去何ヶ月分のデータを取得するか（デフォルト: 6）")
+    process_parser.add_argument("--update", action='store_true', default=False, help="データベースに実際に保存する")
+    
+    # statsサブコマンド
+    stats_parser = subparsers.add_parser('stats', help='統計情報を表示')
     
     args = parser.parse_args()
+    
+    # コマンドが指定されていない場合はエラー
+    if args.command is None:
+        parser.print_help()
+        LOGGER.error("実行する処理を指定してください（process, stats）")
+        exit(1)
+    
     LOGGER.info(f"実行引数: {args}")
     
     # データベース接続
     DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
     
     try:
-        if args.stats:
+        if args.command == 'stats':
             # 統計情報表示
-            stats_sql = """
-            SELECT 
-                COUNT(*) as total_runs,
-                COUNT(CASE WHEN ref.id_run IS NOT NULL THEN 1 END) as processed_runs,
-                COUNT(CASE WHEN ref.id_run IS NULL THEN 1 END) as pending_runs
-            FROM estate_run r
-            LEFT JOIN estate_detail_ref ref ON r.id = ref.id_run
-            WHERE r.is_success = true
-            """
-            stats_df = DB.select_sql(stats_sql)
-            LOGGER.info("=== 統計情報 ===", color=["BOLD", "BLUE"])
-            LOGGER.info(f"総run数: {stats_df.iloc[0]['total_runs']}")
-            LOGGER.info(f"処理済み: {stats_df.iloc[0]['processed_runs']}")
-            LOGGER.info(f"未処理: {stats_df.iloc[0]['pending_runs']}")
+            # 総run数を取得
+            total_sql = "SELECT COUNT(*) as total_runs FROM estate_run WHERE is_success = true"
+            total_df = DB.select_sql(total_sql)
+            total_runs = total_df.iloc[0]['total_runs'] if not total_df.empty else 0
             
-        elif args.runid:
-            # run_id範囲指定処理
-            run_ids = parse_runid_range(args.runid)
-            if len(run_ids) == 1:
-                # 単一のrun_id処理
-                process_run_id(DB, run_ids[0], args.months, args.update)
+            # 処理済みrun数を取得（DISTINCTでカウント）
+            processed_sql = "SELECT COUNT(DISTINCT id_run) as processed_runs FROM estate_detail_ref"
+            processed_df = DB.select_sql(processed_sql)
+            processed_runs = processed_df.iloc[0]['processed_runs'] if not processed_df.empty else 0
+            
+            # 未処理run数を計算
+            pending_runs = total_runs - processed_runs
+            
+            # 処理進捗率を計算
+            progress_percent = (processed_runs / total_runs * 100) if total_runs > 0 else 0
+            
+            LOGGER.info("=== 処理統計 ===")
+            LOGGER.info(f"成功したRUN総数: {total_runs:,}")
+            LOGGER.info(f"処理済みRUN数: {processed_runs:,}")
+            LOGGER.info(f"未処理RUN数: {pending_runs:,}")
+            LOGGER.info(f"処理進捗: {progress_percent:.1f}%")
+            
+        elif args.command == 'process':
+            # データ参照関係生成処理
+            if args.runid:
+                # run_id範囲指定処理
+                run_ids = parse_runid_range(args.runid)
+                if len(run_ids) == 1:
+                    # 単一のrun_id処理
+                    process_run_id(DB, run_ids[0], args.months, args.update)
+                else:
+                    # 複数のrun_id処理（範囲指定・上書きモード）
+                    process_multiple_runs(DB, run_ids, None, args.limit, args.months, args.update)
+            elif args.recent:
+                # 直近X ヶ月以内の処理
+                process_multiple_runs(DB, None, args.recent, args.limit, args.months, args.update)
             else:
-                # 複数のrun_id処理（範囲指定・上書きモード）
-                process_multiple_runs(DB, run_ids, None, args.limit, args.months, args.update)
-        elif args.recent:
-            # 直近X ヶ月以内の処理
-            process_multiple_runs(DB, None, args.recent, args.limit, args.months, args.update)
-        else:
-            # 未処理分を自動処理
-            process_multiple_runs(DB, None, None, args.limit, args.months, args.update)
+                # 未処理分を自動処理
+                process_multiple_runs(DB, None, None, args.limit, args.months, args.update)
             
     except Exception as e:
         LOGGER.error(f"処理中にエラーが発生しました: {e}", color=["BOLD", "RED"])

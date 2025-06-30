@@ -829,8 +829,9 @@ if __name__ == "__main__":
                 
                 # DBから存在するrun_idのみを取得
                 if requested_run_ids:
-                    run_ids_str = ','.join(map(str, requested_run_ids))
-                    check_sql = f"SELECT id FROM estate_run WHERE id IN ({run_ids_str}) AND is_success = true ORDER BY id"
+                    min_id = min(requested_run_ids)
+                    max_id = max(requested_run_ids)
+                    check_sql = f"SELECT id FROM estate_run WHERE id BETWEEN {min_id} AND {max_id} AND is_success = true ORDER BY id"
                     existing_df = db.select_sql(check_sql)
                     run_ids = existing_df['id'].tolist() if not existing_df.empty else []
                     
