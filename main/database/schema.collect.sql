@@ -198,6 +198,7 @@ ALTER TABLE ONLY public.estate_detail
 CREATE INDEX estate_detail_0 ON public.estate_detail USING btree (id_run);
 CREATE INDEX estate_detail_1 ON public.estate_detail USING btree (id_key);
 
+
 --
 -- Name: estate_main estate_main_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
@@ -236,6 +237,9 @@ ALTER TABLE ONLY public.estate_mst_key
 
 ALTER TABLE ONLY public.estate_run
     ADD CONSTRAINT estate_run_pkey PRIMARY KEY (id);
+CREATE INDEX estate_run_0 ON public.estate_run (is_success);
+CREATE INDEX estate_run_1 ON public.estate_run (timestamp);
+CREATE INDEX estate_run_2 ON public.estate_run(id, is_success, timestamp);
 
 
 --

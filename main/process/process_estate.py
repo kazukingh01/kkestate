@@ -6,10 +6,7 @@
 import argparse
 import json
 import sys
-import os
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
-from datetime import datetime
 
 from kklogger import set_logger
 from kkpsgre.connector import DBConnector
@@ -382,33 +379,75 @@ def clean_single_value_to_json(raw_name: str, cleaned_name: str, raw_value: Any,
         LOGGER.warning(f"クレンジングエラー ({raw_name}): {e}")
         return {"value": str(raw_value), "error": str(e)}
 
-def get_unprocessed_runs(db: DBConnector, limit: int = 1000) -> List[int]:
+def get_unprocessed_runs(db: DBConnector, limit: int = 1000, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[int]:
     """
     未処理のrun_idリストを取得する
     
     Args:
         db: データベースコネクター
         limit: 取得する最大件数
+        date_from: 開始日 (YYYYMMDD形式)
+        date_to: 終了日 (YYYYMMDD形式)
         
     Returns:
         未処理のrun_idのリスト
     """
-    sql = f"""
-    SELECT r.id 
-    FROM estate_run r 
-    WHERE r.is_success = true 
-    AND EXISTS (
-        SELECT 1 FROM estate_detail d 
-        JOIN estate_mst_key k ON d.id_key = k.id 
-        WHERE d.id_run = r.id AND k.id_cleaned IS NOT NULL 
-        LIMIT 1
-    )
-    AND NOT EXISTS (
-        SELECT 1 FROM estate_cleaned c WHERE c.id_run = r.id
-    )
-    ORDER BY r.id
-    LIMIT {limit}
-    """
+    if date_from or date_to:
+        # 期間指定がある場合: WITH句でrun_idを絞り込み、min/maxでdetailを絞り込む
+        date_conditions = []
+        if date_from:
+            date_conditions.append(f"timestamp >= '{date_from[0:4]}-{date_from[4:6]}-{date_from[6:8]} 00:00:00'")
+        if date_to:
+            date_conditions.append(f"timestamp <= '{date_to[0:4]}-{date_to[4:6]}-{date_to[6:8]} 23:59:59'")
+        
+        date_condition_sql = "AND " + " AND ".join(date_conditions)
+        
+        sql = f"""
+        WITH filtered_runs AS (
+            SELECT id
+            FROM estate_run
+            WHERE is_success = true
+            {date_condition_sql}
+        ),
+        run_range AS (
+            SELECT MIN(id) as min_id, MAX(id) as max_id
+            FROM filtered_runs
+        )
+        SELECT r.id
+        FROM filtered_runs r
+        CROSS JOIN run_range rr
+        WHERE NOT EXISTS (
+            SELECT 1 FROM estate_cleaned c WHERE c.id_run = r.id
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM estate_detail d
+            JOIN estate_mst_key k ON k.id = d.id_key AND k.id_cleaned IS NOT NULL
+            WHERE d.id_run = r.id
+            AND d.id_run BETWEEN rr.min_id AND rr.max_id
+            LIMIT 1
+        )
+        ORDER BY r.id
+        LIMIT {limit}
+        """
+    else:
+        # 期間指定がない場合: シンプルなSQL
+        sql = f"""
+        SELECT r.id 
+        FROM estate_run r 
+        WHERE r.is_success = true 
+        AND EXISTS (
+            SELECT 1 FROM estate_detail d 
+            JOIN estate_mst_key k ON d.id_key = k.id 
+            WHERE d.id_run = r.id AND k.id_cleaned IS NOT NULL 
+            LIMIT 1
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM estate_cleaned c WHERE c.id_run = r.id
+        )
+        ORDER BY r.id
+        LIMIT {limit}
+        """
     
     result_df = db.select_sql(sql)
     return result_df['id'].tolist() if not result_df.empty else []
@@ -581,7 +620,7 @@ def process_single_run(db: DBConnector, run_id: int, update_db: bool = True, tar
         LOGGER.error(f"run_id {run_id} の処理中にエラーが発生しました: {e}")
         return False
 
-def process_batch(db: DBConnector, batch_size: int = 100, update_db: bool = True) -> Dict[str, int]:
+def process_batch(db: DBConnector, batch_size: int = 100, update_db: bool = True, date_from: Optional[str] = None, date_to: Optional[str] = None) -> Dict[str, int]:
     """
     バッチ処理でデータクレンジングを実行する
     
@@ -589,13 +628,15 @@ def process_batch(db: DBConnector, batch_size: int = 100, update_db: bool = True
         db: データベースコネクター
         batch_size: バッチサイズ
         update_db: Trueの場合はDBを更新、Falseの場合は分析のみ
+        date_from: 開始日 (YYYYMMDD形式)
+        date_to: 終了日 (YYYYMMDD形式)
         
     Returns:
         処理結果統計
     """
     try:
         # 未処理のrun_idリストを取得
-        unprocessed_runs = get_unprocessed_runs(db, batch_size)
+        unprocessed_runs = get_unprocessed_runs(db, batch_size, date_from, date_to)
         
         if not unprocessed_runs:
             return {'total': 0, 'success': 0, 'failed': 0}
@@ -686,6 +727,9 @@ if __name__ == "__main__":
   python process_estate.py process --keyid 123 --runid 1000 --update        # 特定key_id+run_id再クレンジング
   python process_estate.py process --keyid 123,124 --runid 1,1000 --update  # 特定key_id+run_id範囲
   python process_estate.py process --batchsize 500   # バッチサイズ変更
+  python process_estate.py process --fr 20250601     # 2025年6月1日以降のデータを処理
+  python process_estate.py process --to 20250630     # 2025年6月30日までのデータを処理
+  python process_estate.py process --fr 20250601 --to 20250630  # 期間指定
   
   # 統計情報表示
   python process_estate.py stats                     # 処理統計を表示
@@ -708,6 +752,8 @@ if __name__ == "__main__":
     process_parser.add_argument("--batchsize", type=int, default=100, help='バッチ処理のサイズ（デフォルト: 100）')
     process_parser.add_argument("--runid", type=lambda x: parse_runid_range(x), help='特定のrun_idのみを処理（範囲指定: 1,1000 で1から1000まで、単一指定: 123）')
     process_parser.add_argument('--keyid', type=parse_runid_range, help='特定のkey_idのみ処理（例: 123 または 120,125）')
+    process_parser.add_argument('--fr', type=str, help='処理対象の開始日（YYYYMMDD形式）')
+    process_parser.add_argument('--to', type=str, help='処理対象の終了日（YYYYMMDD形式）')
     
     # statsサブコマンド
     stats_parser = subparsers.add_parser('stats', help='処理統計を表示')
@@ -818,7 +864,19 @@ if __name__ == "__main__":
                 # バッチ処理
                 action = "データクレンジング処理" if args.update else "データクレンジング分析"
                 LOGGER.info(f"{action}を開始", color=["BOLD", "GREEN"])
-                result = process_batch(db, args.batchsize, update_db=args.update)
+                # 日付引数を取得
+                date_from = args.fr if hasattr(args, 'fr') and args.fr else None
+                date_to = args.to if hasattr(args, 'to') and args.to else None
+                
+                if date_from or date_to:
+                    date_msg = []
+                    if date_from:
+                        date_msg.append(f"開始日: {date_from}")
+                    if date_to:
+                        date_msg.append(f"終了日: {date_to}")
+                    LOGGER.info(f"日付条件: {', '.join(date_msg)}")
+                
+                result = process_batch(db, args.batchsize, update_db=args.update, date_from=date_from, date_to=date_to)
                 
                 if result['total'] == 0:
                     LOGGER.warning("処理対象のデータがありません")
