@@ -3,9 +3,10 @@ DIRBASE=/home/ubuntu/kkestate
 # !!! environment variable !!! must be not used in below "PATH". x ${PYTHONPATH}:/usr/local/nvi... o /root/master/bin:/usr/local/nvi...
 PATH=/home/ubuntu/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+# collect
 0    0   1,11,21 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 1
-*/10 *   1,11,21 * * ubuntu  sleep 60 && ! pgrep -f "suumo.py --updateurls" && bash ${DIRBASE}/main/collect/monitor.sh 2
-*/10 *   2,12,22 * * ubuntu  sleep 60 && ! pgrep -f "suumo.py --updateurls" && bash ${DIRBASE}/main/collect/monitor.sh 2
+*/10 *   1,11,21 * * ubuntu  sleep 60 && ! pgrep -f "[s]uumo.py --updateurls" && bash ${DIRBASE}/main/collect/monitor.sh 2
+*/10 *   2,12,22 * * ubuntu  sleep 60 && ! pgrep -f "[s]uumo.py --updateurls" && bash ${DIRBASE}/main/collect/monitor.sh 2
 */10 *   2,12,22 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
 */10 *   3,13,23 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
 */10 *   4,14,24 * * ubuntu  bash ${DIRBASE}/main/collect/monitor.sh 3
