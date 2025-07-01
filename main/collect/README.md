@@ -1,14 +1,28 @@
 # Purpose
 
+To collect real estate data scraping from "Suumo".
+
+# Schedule
+
+see: [crontab](../others/crontab)
+
+# Script
+
+```bash
+bash monitor 1
+bash monitor 2
+bash monitor 3
+```
+
 # Workflow
 
 ```mermaid
 flowchart LR
   %% Cron Schedule
   subgraph CronSchedule["Cron Schedule"]
-    C1["月3回<br>1,11,21日"]
-    C2["月6回<br>2,12,22日<br>0時,12時"]
-    C3["10分毎<br>指定日の間"]
+    C1["①月3回<br>1,11,21日"]
+    C2["②10分毎(①の後)<br>指定日の間"]
+    C3["③10分毎(②の後)<br>指定日の間"]
   end
 
   %% Processes
