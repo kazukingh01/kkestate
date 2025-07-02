@@ -11,35 +11,34 @@
 -- 例: /ms/chuko/tokyo/sc_koto/nc_74051837/
 
 -- 既存のMATERIALIZED VIEWを削除（存在する場合）
-DROP MATERIALIZED VIEW IF EXISTS estate_main_extended;
+DROP MATERIALIZED VIEW IF EXISTS estate_main_extended CASCADE;
 
 CREATE MATERIALIZED VIEW estate_main_extended AS
 SELECT 
     em.id,
-    em.name,
-    em.url,
-    em.sys_updated,
     
-    -- 物件タイプ判定 (ms: マンション, ikkodate: 一戸建て, shinchiku: 新築, chuko: 中古)
+    -- 物件タイプ判定 (ms: マンション, ikkodate: 一戸建て, tochi: 土地, shinchiku: 新築, chuko: 中古)
     CASE 
         WHEN em.url LIKE '/ms/shinchiku/%' THEN 'ms_new'
         WHEN em.url LIKE '/ms/chuko/%' THEN 'ms_used'
         WHEN em.url LIKE '/ikkodate/%' THEN 'house_new'
         WHEN em.url LIKE '/chukoikkodate/%' THEN 'house_used'
+        WHEN em.url LIKE '/tochi/%' THEN 'land'
         ELSE 'unknown'
     END AS property_type,
     
-    -- 新築/中古判定
+    -- 新築/中古判定 (Boolean: true=新築, false=中古, null=土地・unknown)
     CASE 
-        WHEN em.url LIKE '/ms/shinchiku/%' OR em.url LIKE '/ikkodate/%' THEN 'new'
-        WHEN em.url LIKE '/ms/chuko/%' OR em.url LIKE '/chukoikkodate/%' THEN 'used'
-        ELSE 'unknown'
-    END AS new_used,
+        WHEN em.url LIKE '/ms/shinchiku/%' OR em.url LIKE '/ikkodate/%' THEN true
+        WHEN em.url LIKE '/ms/chuko/%' OR em.url LIKE '/chukoikkodate/%' THEN false
+        ELSE null
+    END AS is_new,
     
     -- 建物タイプ判定
     CASE 
         WHEN em.url LIKE '/ms/%' THEN 'mansion'
         WHEN em.url LIKE '%ikkodate/%' THEN 'house'
+        WHEN em.url LIKE '/tochi/%' THEN 'land'
         ELSE 'unknown'
     END AS building_type,
     
@@ -107,7 +106,10 @@ SELECT
         WHEN em.url ~ '/nc_[0-9]+/' THEN 
             SUBSTRING(em.url FROM '/nc_([0-9]+)/')
         ELSE 'unknown'
-    END AS property_id
+    END AS property_id,
+    
+    -- 更新日時（最後に配置）
+    em.sys_updated
     
 FROM estate_main em;
 
@@ -117,20 +119,19 @@ CREATE UNIQUE INDEX idx_estate_main_extended_id ON estate_main_extended (id);
 
 -- 2. 新規フィールドに対するインデックス
 CREATE INDEX idx_estate_main_extended_property_type ON estate_main_extended (property_type);
-CREATE INDEX idx_estate_main_extended_new_used ON estate_main_extended (new_used);
+CREATE INDEX idx_estate_main_extended_is_new ON estate_main_extended (is_new);
 CREATE INDEX idx_estate_main_extended_building_type ON estate_main_extended (building_type);
 CREATE INDEX idx_estate_main_extended_prefecture ON estate_main_extended (prefecture);
 CREATE INDEX idx_estate_main_extended_city ON estate_main_extended (city);
 CREATE INDEX idx_estate_main_extended_property_id ON estate_main_extended (property_id);
+CREATE INDEX idx_estate_main_extended_sys_updated ON estate_main_extended (sys_updated);
 
 -- 3. 複合インデックス（検索パフォーマンス向上）
 CREATE INDEX idx_estate_main_extended_pref_type ON estate_main_extended (prefecture, property_type);
 CREATE INDEX idx_estate_main_extended_pref_city ON estate_main_extended (prefecture, city);
-CREATE INDEX idx_estate_main_extended_type_newused ON estate_main_extended (building_type, new_used);
+CREATE INDEX idx_estate_main_extended_type_isnew ON estate_main_extended (building_type, is_new);
 
--- 4. 既存フィールドのインデックス（estate_mainから継承）
-CREATE INDEX idx_estate_main_extended_url ON estate_main_extended (url);
-CREATE INDEX idx_estate_main_extended_sys_updated ON estate_main_extended (sys_updated);
+-- 4. sys_updated も追加し、インデックス設定完了
 
 -- MATERIALIZED VIEWの更新コマンド
 -- REFRESH MATERIALIZED VIEW estate_main_extended;
@@ -146,15 +147,26 @@ CREATE INDEX idx_estate_main_extended_sys_updated ON estate_main_extended (sys_u
 -- SELECT * FROM estate_main_extended WHERE prefecture = 'tokyo' AND property_type = 'ms_new';
 --
 -- 4. 中古物件のみ
--- SELECT * FROM estate_main_extended WHERE new_used = 'used';
+-- SELECT * FROM estate_main_extended WHERE is_new = false;
+--
+-- 5. 新築物件のみ
+-- SELECT * FROM estate_main_extended WHERE is_new = true;
+--
+-- 6. 土地のみ
+-- SELECT * FROM estate_main_extended WHERE building_type = 'land';
 
 -- 統計情報:
--- 物件タイプ分布 (10,000件サンプル):
--- - house_new: 37.47% (新築一戸建て)
--- - ms_used: 34.62% (中古マンション) 
--- - house_used: 23.76% (中古一戸建て)
--- - ms_new: 0.45% (新築マンション)
--- - unknown: 3.70%
+-- 物件タイプ分布 (全データ):
+-- - house_new: 42.58% (新築一戸建て)
+-- - ms_used: 33.49% (中古マンション) 
+-- - house_used: 20.90% (中古一戸建て)
+-- - land: 2.73% (土地)
+-- - ms_new: 0.30% (新築マンション)
+--
+-- 建物タイプ分布 (全データ):
+-- - house: 63.48% (一戸建て)
+-- - mansion: 33.79% (マンション)
+-- - land: 2.73% (土地)
 --
 -- 都道府県分布 (10,000件サンプル):
 -- - other: 23.82% (その他都道府県)
