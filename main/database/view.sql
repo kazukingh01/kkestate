@@ -16,6 +16,7 @@ DROP MATERIALIZED VIEW IF EXISTS estate_main_extended CASCADE;
 CREATE MATERIALIZED VIEW estate_main_extended AS
 SELECT 
     em.id,
+    em.name,
     
     -- 物件タイプ判定 (ms: マンション, ikkodate: 一戸建て, tochi: 土地, shinchiku: 新築, chuko: 中古)
     CASE 
