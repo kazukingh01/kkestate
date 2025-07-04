@@ -128,6 +128,7 @@ CREATE TABLE public.estate_run (
     id bigint NOT NULL,
     id_main bigint NOT NULL,
     is_success boolean DEFAULT false NOT NULL,
+    is_ref boolean DEFAULT false NOT NULL,
     "timestamp" timestamp without time zone
 );
 
@@ -239,8 +240,9 @@ ALTER TABLE ONLY public.estate_run
     ADD CONSTRAINT estate_run_pkey PRIMARY KEY (id);
 CREATE INDEX estate_run_0 ON public.estate_run (is_success);
 CREATE INDEX estate_run_1 ON public.estate_run (timestamp);
-CREATE INDEX estate_run_2 ON public.estate_run(id, is_success, timestamp);
-
+CREATE INDEX estate_run_2 ON public.estate_run (id, is_success, timestamp);
+CREATE INDEX estate_run_3 ON public.estate_run (is_ref);
+CREATE INDEX estate_run_4 ON public.estate_run (is_success, is_ref);
 
 --
 -- Name: estate_detail trg_update_sys_estate_detail_0; Type: TRIGGER; Schema: public; Owner: postgres
