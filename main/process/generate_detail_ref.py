@@ -237,6 +237,10 @@ if __name__ == "__main__":
                 dfwk = get_keys_by_target_id_runs(DB, target_id_runs)
                 if dfwk.empty:
                     LOGGER.warning(f"run_id={id_run}: 正常に run が終了しているにも関わらず、データが無く、参照関係も存在しません")
+                    if args.update:
+                        DB.set_sql(f"DELETE FROM estate_detail_ref WHERE id_run = {id_run};")
+                        DB.set_sql(f"UPDATE estate_run SET is_ref = true WHERE id = {id_run};")
+                        DB.execute_sql()
                     continue
                 dfwk = pd.merge(dfwk, df[["id_run", "timestamp"]], how="left", on="id_run")
                 dfwk = dfwk.sort_values(["id_key", "timestamp"], ascending=False).reset_index(drop=True).groupby("id_key")["id_run"].first().reset_index()
