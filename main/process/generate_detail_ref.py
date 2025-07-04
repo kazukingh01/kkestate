@@ -19,6 +19,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from kklogger import set_logger
 from kkpsgre.connector import DBConnector
+from kkpsgre.util.com import check_type_list
 from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
 
 LOGGER = set_logger(__name__)
@@ -62,8 +63,10 @@ def get_extended_runs_data(db: DBConnector, run_ids: list[int] | None = None, re
     Returns:
         tuple: (拡張run情報DataFrame, 対象run_id最小値, 対象run_id最大値)
     """
+    assert isinstance(db, DBConnector)
     if recent_months is None:
         assert run_ids is not None
+        assert isinstance(run_ids, list) and check_type_list(run_ids, int)
         dfwk = db.select_sql(
             f"""
             SELECT MIN(timestamp) as t_min, MAX(timestamp) as t_max FROM estate_run
@@ -75,6 +78,7 @@ def get_extended_runs_data(db: DBConnector, run_ids: list[int] | None = None, re
         max_timestamp = dfwk["t_max"].iloc[0]
     else:
         assert run_ids is None
+        assert isinstance(recent_months, int) and recent_months > 0
         min_timestamp = datetime.now() - timedelta(days=recent_months * 31)
         max_timestamp = datetime.now()
     extended_min_date = min_timestamp - timedelta(days=months_back * 31)
@@ -105,8 +109,8 @@ def get_keys_by_target_id_runs(db: DBConnector, run_ids: list[int]) -> pd.DataFr
     Returns:
         pd.DataFrame: id_run, id_keyのペア
     """
-    assert run_ids is not None
-    assert len(run_ids) > 0
+    assert isinstance(db, DBConnector)
+    assert isinstance(run_ids, list) and check_type_list(run_ids, int)
     sql = f"""
     SELECT 
         id_run,
@@ -128,6 +132,8 @@ def get_unprocessed_runs(db: DBConnector, limit: int = 100) -> pd.DataFrame:
     Returns:
         pd.DataFrame: 未処理のrun情報（id_run, id_main, timestamp）
     """
+    assert isinstance(db, DBConnector)
+    assert isinstance(limit, int) and limit > 0
     sql = f"""
     SELECT id as id_run, id_main, timestamp
     FROM estate_run
@@ -229,6 +235,9 @@ if __name__ == "__main__":
             for id_run, id_main, timestamp in df.loc[(df["id_run"] >= run_id_min) & (df["id_run"] <= run_id_max), ["id_run", "id_main", "timestamp"]].to_numpy():
                 target_id_runs = df.loc[(df["id_main"] == id_main) & (df["timestamp"] >= (timestamp - timedelta(days=args.months * 31))) & (df["id_run"] <= id_run), "id_run"].tolist()
                 dfwk = get_keys_by_target_id_runs(DB, target_id_runs)
+                if dfwk.empty:
+                    LOGGER.warning(f"run_id={id_run}: 正常に run が終了しているにも関わらず、データが無く、参照関係も存在しません")
+                    continue
                 dfwk = pd.merge(dfwk, df[["id_run", "timestamp"]], how="left", on="id_run")
                 dfwk = dfwk.sort_values(["id_key", "timestamp"], ascending=False).reset_index(drop=True).groupby("id_key")["id_run"].first().reset_index()
                 dfwk.columns = dfwk.columns.str.replace("id_run", "id_run_ref")
