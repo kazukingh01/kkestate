@@ -217,7 +217,7 @@ def get_target_runs_info(db: DBConnector, run_ids: list = None, recent_months: i
         FROM estate_run
         WHERE id BETWEEN {min_id} AND {max_id}
           AND is_success = true
-        ORDER BY id DESC
+        ORDER BY id ASC
         """
     elif recent_months:
         # 直近X ヶ月以内の処理対象を取得（既存データは除く）
@@ -229,7 +229,7 @@ def get_target_runs_info(db: DBConnector, run_ids: list = None, recent_months: i
         WHERE r.is_success = true
           AND r.timestamp >= '{recent_start_date}'
           AND ref.id_run IS NULL
-        ORDER BY r.id DESC
+        ORDER BY r.id ASC
         """
     else:
         # 未処理分自動処理
@@ -239,7 +239,7 @@ def get_target_runs_info(db: DBConnector, run_ids: list = None, recent_months: i
         LEFT JOIN estate_detail_ref ref ON r.id = ref.id_run
         WHERE r.is_success = true
           AND ref.id_run IS NULL
-        ORDER BY r.id DESC
+        ORDER BY r.id ASC
         LIMIT {limit}
         """
     
