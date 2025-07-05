@@ -3,7 +3,10 @@
 
 -- reinfolib_estateテーブル作成
 CREATE TABLE reinfolib_estate (
-    -- 追加カラム（主キー用）
+    -- 主キー
+    id                      bigserial PRIMARY KEY,         -- 自動採番ID
+    
+    -- 追加カラム
     year                    smallint NOT NULL,              -- 取引年（例: 2024）
     period                  smallint NOT NULL,              -- 四半期（1-4）
     prefecture_code         char(2) NOT NULL,               -- 都道府県コード（01-47）
@@ -42,11 +45,17 @@ CREATE TABLE reinfolib_estate (
     
     -- システムカラム
     sys_created             timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    sys_updated             timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    -- 主キー制約
-    CONSTRAINT pk_reinfolib_estate PRIMARY KEY (year, period, prefecture_code)
+    sys_updated             timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- インデックス作成
+CREATE INDEX idx_reinfolib_estate_year_period_pref ON reinfolib_estate (year, period, prefecture_code);
+CREATE INDEX idx_reinfolib_estate_year_period ON reinfolib_estate (year, period);
+CREATE INDEX idx_reinfolib_estate_prefecture ON reinfolib_estate (prefecture_code);
+CREATE INDEX idx_reinfolib_estate_transaction_price ON reinfolib_estate (transaction_price);
+CREATE INDEX idx_reinfolib_estate_property_type ON reinfolib_estate (property_type);
+CREATE INDEX idx_reinfolib_estate_area ON reinfolib_estate (area_sqm);
+CREATE INDEX idx_reinfolib_estate_transaction_period ON reinfolib_estate (transaction_period);
 
 -- コメント追加
 COMMENT ON TABLE reinfolib_estate IS '国土交通省 不動産取引価格情報';
