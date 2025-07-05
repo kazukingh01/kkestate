@@ -1,9 +1,6 @@
 -- REINFOLIBの不動産取引価格情報を格納するテーブル
 -- 国土交通省の不動産取引価格情報ダウンロードデータ
 
--- テーブル削除（再作成時用）
-DROP TABLE IF EXISTS reinfolib_estate CASCADE;
-
 -- reinfolib_estateテーブル作成
 CREATE TABLE reinfolib_estate (
     -- 追加カラム（主キー用）

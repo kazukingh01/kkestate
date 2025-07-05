@@ -2,10 +2,15 @@ import argparse
 import os
 import time
 import re
+import zipfile
+import tempfile
+import shutil
 from datetime import datetime
 from playwright.sync_api import Playwright, sync_playwright, expect
 from kklogger import set_logger
 import pandas as pd
+from kkpsgre.connector import DBConnector
+from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
 
 LOGGER = set_logger(__name__)
 
@@ -378,42 +383,255 @@ def download_estate_prices(playwright: Playwright, year: int, period: int, downl
         browser.close()
 
 
+def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
+    """
+    land CSVファイルをデータベースにアップロード
+    
+    Args:
+        download_dir: CSVファイルが格納されたディレクトリ
+        update: データベース更新を実行するか
+    """
+    LOGGER.info(f"Landデータのデータベースアップロード開始: {download_dir}")
+    LOGGER.error("Land データのアップロード機能は未実装です", color=["BOLD", "RED"])
+    # TODO: 実装予定
+    # - reinfolib_land_YYYY_PP.csv形式のファイルを読み込み
+    # - 適切なテーブル構造へ変換
+    # - reinfolib_landテーブルへ投入
+    raise NotImplementedError("Land データのアップロード機能は未実装です")
+
+
+def upload_estate_to_db(download_dir: str = "./downloads", update: bool = False):
+    """
+    estate ZIPファイルを展開してデータベースにアップロード
+    
+    Args:
+        download_dir: ZIPファイルが格納されたディレクトリ
+        update: データベース更新を実行するか
+    """
+    LOGGER.info(f"Estateデータのデータベースアップロード開始: {download_dir}")
+    
+    # カラムマッピング（CSVカラム名 -> DBカラム名）
+    column_mapping = {
+        '種類': 'property_type',
+        '価格情報区分': 'price_info_category',
+        '地域': 'region',
+        '市区町村コード': 'municipality_code',
+        '都道府県名': 'prefecture_name',
+        '市区町村名': 'municipality_name',
+        '地区名': 'district_name',
+        '最寄駅：名称': 'nearest_station_name',
+        '最寄駅：距離（分）': 'nearest_station_distance',
+        '取引価格（総額）': 'transaction_price',
+        '坪単価': 'price_per_tsubo',
+        '間取り': 'floor_plan',
+        '面積（u）': 'area_sqm',
+        '取引価格（u単価）': 'price_per_sqm',
+        '土地の形状': 'land_shape',
+        '間口': 'frontage',
+        '延床面積（u）': 'floor_area_sqm',
+        '建築年': 'building_year',
+        '建物の構造': 'building_structure',
+        '用途': 'use',
+        '今後の利用目的': 'future_use',
+        '前面道路：方位': 'front_road_direction',
+        '前面道路：種類': 'front_road_type',
+        '前面道路：幅員（ｍ）': 'front_road_width',
+        '都市計画': 'city_planning',
+        '建ぺい率（％）': 'coverage_ratio',
+        '容積率（％）': 'floor_area_ratio',
+        '取引時期': 'transaction_period',
+        '改装': 'renovation',
+        '取引の事情等': 'transaction_notes'
+    }
+    
+    # データベース接続
+    DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
+    
+    # reinfolib_estate_*.zip ファイルを探す
+    zip_files = [f for f in os.listdir(download_dir) if f.startswith('reinfolib_estate_') and f.endswith('.zip')]
+    
+    if not zip_files:
+        LOGGER.warning(f"{download_dir} にreinfolib_estate_*.zipファイルが見つかりません")
+        return
+    
+    LOGGER.info(f"{len(zip_files)}個のZIPファイルを処理します")
+    
+    success_count = 0
+    failed_count = 0
+    
+    for zip_file in sorted(zip_files):
+        # ファイル名からyearとperiodを抽出 (reinfolib_estate_YYYY_P.zip)
+        match = re.match(r'reinfolib_estate_(\d{4})_(\d)\.zip', zip_file)
+        if not match:
+            LOGGER.warning(f"ファイル名が不正です: {zip_file}")
+            continue
+        
+        year = int(match.group(1))
+        period = int(match.group(2))
+        
+        LOGGER.info(f"処理中: {zip_file} (Year: {year}, Period: {period})")
+        
+        # 一時ディレクトリを作成
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # ZIPファイルを展開
+            zip_path = os.path.join(download_dir, zip_file)
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                zf.extractall(temp_dir)
+                LOGGER.info(f"  ZIP展開完了: {temp_dir}")
+            
+            # CSVファイルを処理
+            csv_files = [f for f in os.listdir(temp_dir) if f.endswith('.csv')]
+            LOGGER.info(f"  {len(csv_files)}個のCSVファイルを処理")
+            
+            all_data = []
+            
+            for csv_file in csv_files:
+                # ファイル名から都道府県コードを抽出
+                match_csv = re.match(r'(\d{2})_', csv_file)
+                if not match_csv:
+                    LOGGER.warning(f"    CSVファイル名が不正です: {csv_file}")
+                    continue
+                
+                prefecture_code = match_csv.group(1)
+                csv_path = os.path.join(temp_dir, csv_file)
+                
+                # CSVを読み込み（Shift-JIS）
+                try:
+                    df = pd.read_csv(csv_path, encoding='shift_jis', encoding_errors='ignore')
+                except pd.errors.EmptyDataError:
+                    LOGGER.warning(f"    {csv_file}: 空のCSVファイル")
+                    continue
+                
+                # 空のDataFrameの場合はスキップ
+                if df.empty:
+                    LOGGER.info(f"    {csv_file}: データなし")
+                    continue
+                
+                # カラム名を変換
+                df = df.rename(columns=column_mapping)
+                
+                # year, period, prefecture_codeを追加
+                df['year'] = year
+                df['period'] = period
+                df['prefecture_code'] = prefecture_code
+                
+                # 数値型の変換とクリーニング
+                numeric_columns = ['nearest_station_distance', 'transaction_price', 'price_per_tsubo', 
+                                 'area_sqm', 'price_per_sqm', 'frontage', 'floor_area_sqm', 
+                                 'front_road_width', 'coverage_ratio', 'floor_area_ratio']
+                
+                for col in numeric_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                all_data.append(df)
+                LOGGER.info(f"    {csv_file}: {len(df)}行読み込み")
+            
+            # 全データを結合
+            if all_data:
+                combined_df = pd.concat(all_data, ignore_index=True)
+                LOGGER.info(f"  合計: {len(combined_df)}行")
+                
+                if update:
+                    # 既存データを削除
+                    delete_sql = f"DELETE FROM reinfolib_estate WHERE year = {year} AND period = {period}"
+                    DB.set_sql(delete_sql)
+                    LOGGER.info(f"  既存データ削除: year={year}, period={period}")
+                    
+                    # 新データを挿入
+                    DB.insert_from_df(combined_df, 'reinfolib_estate', is_select=False, set_sql=True)
+                    DB.execute_sql()
+                    LOGGER.info(f"  データベース挿入完了: {len(combined_df)}行", color=["BOLD", "GREEN"])
+                else:
+                    LOGGER.info(f"  [ドライラン] データベース挿入をスキップ")
+                
+                success_count += 1
+            else:
+                LOGGER.warning(f"  有効なデータがありません")
+                failed_count += 1
+    
+    LOGGER.info(f"\n=== アップロード完了 ===")
+    LOGGER.info(f"成功: {success_count} ファイル")
+    LOGGER.info(f"失敗: {failed_count} ファイル")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="国土交通省の不動産取引価格情報をダウンロード",
+        description='国土交通省 不動産取引価格情報・地価公示データ取得ツール',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
+=================================================================
 実行例:
-  # 不動産取引価格情報（2024年第4四半期）をダウンロード
+
+■ 不動産取引価格情報（estate）のダウンロード
+  # 基本的な使用方法（2024年第4四半期）
   python reinfolib.py estate --year 2024 --period 4
   
-  # 地価公示・地価調査データ（2024年・東京都）をスクレイピング
-  python reinfolib.py land --year 2024 --prefecture-code 13
-  
-  # ダウンロード先を指定
+  # 保存先を指定してダウンロード
   python reinfolib.py estate --year 2024 --period 3 --download-dir /home/share/reinfolib
   
-  # ヘッドレスモードで実行
+  # ヘッドレスモード（ブラウザ非表示）で実行
+  python reinfolib.py estate --year 2024 --period 2 --headless
+  
+  # 一括ダウンロード（別スクリプト）
+  bash download_reinfolib_estate_all.sh
+
+■ 地価公示・地価調査データ（land）のスクレイピング
+  # 基本的な使用方法（2024年・東京都）
+  python reinfolib.py land --year 2024 --prefecture-code 13
+  
+  # 全都道府県コード例
+  # 北海道:01, 青森:02, 岩手:03, 宮城:04, 秋田:05, 山形:06, 福島:07
+  # 茨城:08, 栃木:09, 群馬:10, 埼玉:11, 千葉:12, 東京:13, 神奈川:14
+  # 新潟:15, 富山:16, 石川:17, 福井:18, 山梨:19, 長野:20, 岐阜:21
+  # 静岡:22, 愛知:23, 三重:24, 滋賀:25, 京都:26, 大阪:27, 兵庫:28
+  # 奈良:29, 和歌山:30, 鳥取:31, 島根:32, 岡山:33, 広島:34, 山口:35
+  # 徳島:36, 香川:37, 愛媛:38, 高知:39, 福岡:40, 佐賀:41, 長崎:42
+  # 熊本:43, 大分:44, 宮崎:45, 鹿児島:46, 沖縄:47
+  
+  # ヘッドレスモードで実行（大阪府）
   python reinfolib.py land --year 2023 --prefecture-code 27 --headless
+  
+  # 一括スクレイピング（別スクリプト・1970-2024年全都道府県）
+  bash download_reinfolib_land_all.sh
+
+■ ダウンロード済みデータのデータベース投入
+  # Estate データ（不動産取引価格）のDB投入
+  python reinfolib.py uploadestate                      # ドライラン
+  python reinfolib.py uploadestate --update              # DB更新
+  python reinfolib.py uploadestate --download-dir /home/share/reinfolib --update
+  
+  # Land データ（地価公示・地価調査）のDB投入
+  python reinfolib.py uploadland                        # ドライラン
+  python reinfolib.py uploadland --update                # DB更新（※未実装）
+
+=================================================================
+注意事項:
+  - estate: ZIPファイルをダウンロード（四半期ごと、全国一括）
+  - land: CSVファイルを生成（年度ごと、都道府県別）
+  - uploadestate: estateデータ（ZIPファイル）のDB投入
+  - uploadland: landデータ（CSVファイル）のDB投入（※未実装）
+  - データベース更新時は --update フラグが必須（安全のため）
+  - 大量データ取得時はヘッドレスモード推奨（--headless）
+  - ダウンロード済みファイルは再取得しません（既存ファイルチェック）
+=================================================================
 '''
     )
     
-    parser.add_argument("type", choices=["estate", "land"], help="データタイプ（estate: 不動産取引価格, land: 地価公示・地価調査）")
-    parser.add_argument("--year", type=int, required=True, help="対象年（例: 2024）")
+    parser.add_argument("type", choices=["estate", "land", "uploadestate", "uploadland"], help="コマンドタイプ（estate: 不動産取引価格ダウンロード, land: 地価公示・地価調査スクレイピング, uploadestate: estateデータDB投入, uploadland: landデータDB投入）")
+    parser.add_argument("--year", type=int, help="対象年（例: 2024）（estate/landタイプで必須）")
     parser.add_argument("--period", type=int, choices=[1, 2, 3, 4], help="四半期（1-4）（estateタイプのみ必須）")
     parser.add_argument("--prefecture-code", type=str, help="都道府県コード（01-47の2桁）（landタイプのみ必須）")
     parser.add_argument("--download-dir", type=str, default="./downloads", help="ダウンロード保存先ディレクトリ")
     parser.add_argument("--headless", action="store_true", default=False, help="ヘッドレスモードで実行")
+    parser.add_argument("--update", action="store_true", default=False, help="データベース更新を実行（uploadestate/uploadlandで使用）")
     
     args = parser.parse_args()
     LOGGER.info(f"実行引数: {args}")
     
-    if args.headless:
-        LOGGER.info("ヘッドレスモードで実行します")
-    else:
-        LOGGER.info("ブラウザを表示して実行します")
-    
     # データタイプによる引数検証
+    if args.type in ["estate", "land"] and args.year is None:
+        parser.error(f"{args.type}タイプの場合、--yearは必須です")
     if args.type == "estate" and args.period is None:
         parser.error("estateタイプの場合、--periodは必須です")
     if args.type == "land" and args.prefecture_code is None:
@@ -424,19 +642,31 @@ if __name__ == "__main__":
         if not args.prefecture_code.isdigit() or len(args.prefecture_code) != 2 or not (1 <= int(args.prefecture_code) <= 47):
             parser.error("--prefecture-codeは01-47の2桁で指定してください")
     
-    with sync_playwright() as playwright:
-        if args.type == "estate":
-            filepath = download_estate_prices(playwright, args.year, args.period, args.download_dir, args.headless)
-            LOGGER.info(f"処理完了: {filepath}")
-        elif args.type == "land":
-            # DataFrameを取得
-            df = download_land_prices(playwright, args.year, args.prefecture_code, args.headless)
-            
-            # CSV保存処理
-            os.makedirs(args.download_dir, exist_ok=True)
-            filename = f"reinfolib_land_{args.year}_{args.prefecture_code}.csv"
-            filepath = os.path.join(args.download_dir, filename)
-            df.to_csv(filepath, index=False, encoding='utf-8-sig')
-            
-            LOGGER.info(f"CSV保存完了: {filepath}", color=["BOLD", "GREEN"])
-            LOGGER.info(f"データ行数: {len(df)}行, カラム数: {len(df.columns)}列")
+    if args.type == "uploadestate":
+        # Estate データのアップロード処理
+        upload_estate_to_db(args.download_dir, args.update)
+    elif args.type == "uploadland":
+        # Land データのアップロード処理
+        upload_land_to_db(args.download_dir, args.update)
+    else:
+        # ダウンロード処理
+        if args.headless:
+            LOGGER.info("ヘッドレスモードで実行します")
+        else:
+            LOGGER.info("ブラウザを表示して実行します")        
+        with sync_playwright() as playwright:
+            if args.type == "estate":
+                filepath = download_estate_prices(playwright, args.year, args.period, args.download_dir, args.headless)
+                LOGGER.info(f"処理完了: {filepath}")
+            elif args.type == "land":
+                # DataFrameを取得
+                df = download_land_prices(playwright, args.year, args.prefecture_code, args.headless)
+                
+                # CSV保存処理
+                os.makedirs(args.download_dir, exist_ok=True)
+                filename = f"reinfolib_land_{args.year}_{args.prefecture_code}.csv"
+                filepath = os.path.join(args.download_dir, filename)
+                df.to_csv(filepath, index=False, encoding='utf-8-sig')
+                
+                LOGGER.info(f"CSV保存完了: {filepath}", color=["BOLD", "GREEN"])
+                LOGGER.info(f"データ行数: {len(df)}行, カラム数: {len(df.columns)}列")
