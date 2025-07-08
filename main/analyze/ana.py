@@ -35,7 +35,7 @@ if __name__ == "__main__":
         res = requests.get(tmp)
         assert res.status_code == 200, f"status code is not 200: {x}"
         res = res.json()
-        if len(res) == 0:
+        if len(res) != 1:
             LOGGER.warning(f"no result: {x}")
             if args.update:
                 DB.execute_sql(f"""
@@ -47,17 +47,16 @@ if __name__ == "__main__":
             else:
                 LOGGER.info("  [ドライラン] INSERT をスキップ")
             continue
-        assert len(res) == 1, f"list length is not 1: {res}"
         longitude, latitude = res[0]["geometry"]["coordinates"]
         if args.update:
             DB.execute_sql(f"""
                 INSERT INTO estate_mst_location (location, longitude, latitude)
-                VALUES ('{x.replace("'", "''")}', {longitude}, {latitude})
+                VALUES ('{x.replace("'", "''")}', {longitude:.15f}, {latitude:.15f})
                 ON CONFLICT (location) DO UPDATE SET
                     longitude = EXCLUDED.longitude,
                     latitude = EXCLUDED.latitude,
                     sys_updated = CURRENT_TIMESTAMP
             """)
         else:
-            LOGGER.info(f"  [ドライラン] 緯度: {latitude}, 経度: {longitude}")
+            LOGGER.info(f"  [ドライラン] 緯度: {latitude:.15f}, 経度: {longitude:.15f}")
 
