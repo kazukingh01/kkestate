@@ -383,13 +383,14 @@ def download_estate_prices(playwright: Playwright, year: int, period: int, downl
         browser.close()
 
 
-def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
+def upload_land_to_db(download_dir: str = "./downloads", update: bool = False, skip: bool = False):
     """
     land CSVファイルをデータベースにアップロード
     
     Args:
         download_dir: CSVファイルが格納されたディレクトリ
         update: データベース更新を実行するか
+        skip: 既存データがある場合はスキップするか
     """
     LOGGER.info(f"Landデータのデータベースアップロード開始: {download_dir}")
     
@@ -419,6 +420,14 @@ def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
         year = int(match.group(1))
         prefecture_code = match.group(2)
         
+        # skipフラグがある場合、既存データをチェック
+        if skip:
+            check_sql = f"SELECT COUNT(*) FROM reinfolib_land WHERE year = {year} AND prefecture_code = '{prefecture_code}'"
+            result = DB.select_sql(check_sql)
+            if len(result) > 0 and result.iloc[0, 0] > 0:
+                LOGGER.info(f"スキップ: {csv_file} (Year: {year}, Prefecture: {prefecture_code}) - 既存データあり")
+                continue
+        
         LOGGER.info(f"処理中: {csv_file} (Year: {year}, Prefecture: {prefecture_code})")
         
         csv_path = os.path.join(download_dir, csv_file)
@@ -428,10 +437,6 @@ def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
             df = pd.read_csv(csv_path, encoding='utf-8-sig', skiprows=1)
         except pd.errors.EmptyDataError:
             LOGGER.warning(f"{csv_file}: 空のCSVファイル")
-            failed_count += 1
-            continue
-        except Exception as e:
-            LOGGER.error(f"{csv_file}: 読み込みエラー: {e}")
             failed_count += 1
             continue
         
@@ -624,76 +629,71 @@ def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
         column_mapping = {col: clean_column_name(col) for col in df.columns}
         df = df.rename(columns=column_mapping)
         
-        try:
-            cleaned_df = pd.DataFrame({
-                'year': year,
-                'prefecture_code': prefecture_code,
-                'category': df['category'],
-                'reference_number': df['reference_number'].apply(clean_reference_number),
-                'survey_date': df['survey_date'].apply(parse_survey_date),
-                'location': df['location'],
-                'residential_address': df['residential_address'],
-                'price_per_sqm': df['price_per_sqm'].apply(clean_price),
-                'station_name': df['station_name'],
-                'station_distance': df['station_distance'].apply(clean_distance),
-                'land_area': df['land_area'].apply(clean_area),
-                'land_shape': df['land_shape'],
-                'land_use_category': df['land_use_category'],
-                'building_structure': df['building_structure'],
-                'building_floors': df['building_floors'],
-                'current_use': df['current_use'],
-                'utilities': df['utilities'],
-                'surrounding_use': df['surrounding_use'],
-                'front_road_direction': df['front_road_direction'],
-                'front_road_width': df['front_road_width'].apply(clean_width),
-                'front_road_type': df['front_road_type'],
-                'front_road_pavement': df['front_road_pavement'],
-                'other_road_direction': df.get('other_road_direction'),
-                'other_road_category': df.get('other_road_category'),
-                'use_district': df.get('use_district'),
-                'height_district': df.get('height_district'),
-                'fire_prevention_area': df.get('fire_prevention_area'),
-                'coverage_ratio': df['coverage_ratio'].apply(clean_ratio) if 'coverage_ratio' in df.columns else None,
-                'floor_area_ratio': df['floor_area_ratio'].apply(clean_ratio) if 'floor_area_ratio' in df.columns else None,
-                'city_planning_area': df.get('city_planning_area'),
-                'forest_park_law': df.get('forest_park_law'),
-                'appraisal_report': df.get('appraisal_report'),
-                'appraisal_report_url': df.get('鑑定評価書URL')
-            })
+        cleaned_df = pd.DataFrame({
+            'year': year,
+            'prefecture_code': prefecture_code,
+            'category': df['category'],
+            'reference_number': df['reference_number'].apply(clean_reference_number),
+            'survey_date': df['survey_date'].apply(parse_survey_date),
+            'location': df['location'],
+            'residential_address': df['residential_address'],
+            'price_per_sqm': df['price_per_sqm'].apply(clean_price),
+            'station_name': df['station_name'],
+            'station_distance': df['station_distance'].apply(clean_distance),
+            'land_area': df['land_area'].apply(clean_area),
+            'land_shape': df['land_shape'],
+            'land_use_category': df['land_use_category'],
+            'building_structure': df['building_structure'],
+            'building_floors': df['building_floors'],
+            'current_use': df['current_use'],
+            'utilities': df['utilities'],
+            'surrounding_use': df['surrounding_use'],
+            'front_road_direction': df['front_road_direction'],
+            'front_road_width': df['front_road_width'].apply(clean_width),
+            'front_road_type': df['front_road_type'],
+            'front_road_pavement': df['front_road_pavement'],
+            'other_road_direction': df.get('other_road_direction'),
+            'other_road_category': df.get('other_road_category'),
+            'use_district': df.get('use_district'),
+            'height_district': df.get('height_district'),
+            'fire_prevention_area': df.get('fire_prevention_area'),
+            'coverage_ratio': df['coverage_ratio'].apply(clean_ratio) if 'coverage_ratio' in df.columns else None,
+            'floor_area_ratio': df['floor_area_ratio'].apply(clean_ratio) if 'floor_area_ratio' in df.columns else None,
+            'city_planning_area': df.get('city_planning_area'),
+            'forest_park_law': df.get('forest_park_law'),
+            'appraisal_report': df.get('appraisal_report'),
+            'appraisal_report_url': df.get('鑑定評価書URL')
+        })
+        
+        LOGGER.info(f"  {csv_file}: {len(cleaned_df)}行をクレンジング完了")
+        
+        if update:
+            # 既存データを削除
+            delete_sql = f"DELETE FROM reinfolib_land WHERE year = {year} AND prefecture_code = '{prefecture_code}'"
+            DB.set_sql(delete_sql)
+            LOGGER.info(f"  既存データ削除: year={year}, prefecture_code={prefecture_code}")
             
-            LOGGER.info(f"  {csv_file}: {len(cleaned_df)}行をクレンジング完了")
-            
-            if update:
-                # 既存データを削除
-                delete_sql = f"DELETE FROM reinfolib_land WHERE year = {year} AND prefecture_code = '{prefecture_code}'"
-                DB.set_sql(delete_sql)
-                LOGGER.info(f"  既存データ削除: year={year}, prefecture_code={prefecture_code}")
-                
-                # 新データを挿入
-                DB.insert_from_df(cleaned_df, 'reinfolib_land', is_select=False, set_sql=True)
-                DB.execute_sql()
-                LOGGER.info(f"  データベース挿入完了: {len(cleaned_df)}行", color=["BOLD", "GREEN"])
-            else:
-                LOGGER.info(f"  [ドライラン] データベース挿入をスキップ")
-            
-            success_count += 1
-            
-        except Exception as e:
-            LOGGER.error(f"  {csv_file}: 処理エラー: {e}")
-            failed_count += 1
+            # 新データを挿入
+            DB.insert_from_df(cleaned_df, 'reinfolib_land', is_select=False, set_sql=True)
+            DB.execute_sql()
+            LOGGER.info(f"  データベース挿入完了: {len(cleaned_df)}行", color=["BOLD", "GREEN"])
+        else:
+            LOGGER.info(f"  [ドライラン] データベース挿入をスキップ")
+        success_count += 1
     
     LOGGER.info(f"\n=== アップロード完了 ===")
     LOGGER.info(f"成功: {success_count} ファイル")
     LOGGER.info(f"失敗: {failed_count} ファイル")
 
 
-def upload_estate_to_db(download_dir: str = "./downloads", update: bool = False):
+def upload_estate_to_db(download_dir: str = "./downloads", update: bool = False, skip: bool = False):
     """
     estate ZIPファイルを展開してデータベースにアップロード
     
     Args:
         download_dir: ZIPファイルが格納されたディレクトリ
         update: データベース更新を実行するか
+        skip: 既存データがある場合はスキップするか
     """
     LOGGER.info(f"Estateデータのデータベースアップロード開始: {download_dir}")
     
@@ -755,6 +755,14 @@ def upload_estate_to_db(download_dir: str = "./downloads", update: bool = False)
         
         year = int(match.group(1))
         period = int(match.group(2))
+        
+        # skipフラグがある場合、既存データをチェック
+        if skip:
+            check_sql = f"SELECT COUNT(*) FROM reinfolib_estate WHERE year = {year} AND period = {period}"
+            result = DB.select_sql(check_sql)
+            if len(result) > 0 and result.iloc[0, 0] > 0:
+                LOGGER.info(f"スキップ: {zip_file} (Year: {year}, Period: {period}) - 既存データあり")
+                continue
         
         LOGGER.info(f"処理中: {zip_file} (Year: {year}, Period: {period})")
         
@@ -935,6 +943,7 @@ if __name__ == "__main__":
     parser.add_argument("--download-dir", type=str, default="./downloads", help="ダウンロード保存先ディレクトリ")
     parser.add_argument("--headless", action="store_true", default=False, help="ヘッドレスモードで実行")
     parser.add_argument("--update", action="store_true", default=False, help="データベース更新を実行（uploadestate/uploadlandで使用）")
+    parser.add_argument("--skip", action="store_true", default=False, help="既存データがある場合はスキップ（uploadestate/uploadlandで使用）")
     
     args = parser.parse_args()
     LOGGER.info(f"実行引数: {args}")
@@ -954,10 +963,10 @@ if __name__ == "__main__":
     
     if args.type == "uploadestate":
         # Estate データのアップロード処理
-        upload_estate_to_db(args.download_dir, args.update)
+        upload_estate_to_db(args.download_dir, args.update, args.skip)
     elif args.type == "uploadland":
         # Land データのアップロード処理
-        upload_land_to_db(args.download_dir, args.update)
+        upload_land_to_db(args.download_dir, args.update, args.skip)
     else:
         # ダウンロード処理
         if args.headless:
