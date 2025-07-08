@@ -159,9 +159,7 @@ CREATE INDEX idx_reinfolib_land_category ON reinfolib_land (category);
 CREATE INDEX idx_reinfolib_land_use_district ON reinfolib_land (use_district);
 CREATE INDEX idx_reinfolib_land_station ON reinfolib_land (station_name, station_distance);
 CREATE INDEX idx_reinfolib_land_location ON reinfolib_land (location);
-
--- 複合ユニーク制約（同じ年、都道府県、基準地番号の組み合わせは一意）
-CREATE UNIQUE INDEX idx_reinfolib_land_unique ON reinfolib_land (year, prefecture_code, reference_number);
+CREATE INDEX idx_reinfolib_land_reference_number ON reinfolib_land (reference_number);
 
 -- コメント追加
 COMMENT ON TABLE reinfolib_land IS '国土交通省 地価公示・地価調査データ';
