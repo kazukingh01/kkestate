@@ -501,6 +501,22 @@ def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
             except:
                 return None
         
+        def clean_reference_number(ref_str):
+            """標準地番号の重複文字列をクリーニング（春日-1春日-1 -> 春日-1）"""
+            if pd.isna(ref_str):
+                return None
+            ref_str = str(ref_str).strip()
+            
+            # 文字列長が偶数で、前半と後半が同じ場合は前半のみを返す
+            if len(ref_str) % 2 == 0:
+                mid = len(ref_str) // 2
+                first_half = ref_str[:mid]
+                second_half = ref_str[mid:]
+                if first_half == second_half:
+                    return first_half
+            
+            return ref_str
+        
         def parse_survey_date(date_str):
             """調査基準日をパース（令和6年7月1日 -> 2024-07-01）"""
             if pd.isna(date_str):
@@ -536,43 +552,113 @@ def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
             
             return None
         
-        # カラムマッピング（長いカラム名を適切な名前に）
-        # カラムインデックスで参照（カラム名が長すぎるため）
+        # カラム名マッピング（日本語から英語への変換）
+        def clean_column_name(col_name):
+            """カラム名から余計な文字列を除去して正規化"""
+            import re
+            # 先頭の文字列で厳密にマッチング
+            if col_name.startswith('標準地番号'):
+                return 'reference_number'
+            elif col_name.startswith('調査基準日'):
+                return 'survey_date'
+            elif col_name.startswith('所在及び地番'):
+                return 'location'
+            elif col_name.startswith('住居表示'):
+                return 'residential_address'
+            elif col_name.startswith('価格(円/㎡)'):
+                return 'price_per_sqm'
+            elif col_name.startswith('名称'):
+                return 'station_name'
+            elif col_name.startswith('距離'):
+                return 'station_distance'
+            elif col_name.startswith('地積(㎡)'):
+                return 'land_area'
+            elif col_name.startswith('形状'):
+                return 'land_shape'
+            elif col_name.startswith('利用区分'):
+                return 'land_use_category'
+            elif col_name.startswith('構造'):
+                return 'building_structure'
+            elif col_name.startswith('階層'):
+                return 'building_floors'
+            elif col_name.startswith('利用現況'):
+                return 'current_use'
+            elif col_name.startswith('給排水'):
+                return 'utilities'
+            elif col_name.startswith('周辺の土地'):
+                return 'surrounding_use'
+            elif col_name.startswith('方位') and col_name.endswith('.1'):
+                return 'other_road_direction'
+            elif col_name.startswith('方位'):
+                return 'front_road_direction'
+            elif col_name.startswith('幅員'):
+                return 'front_road_width'
+            elif col_name.startswith('種類'):
+                return 'front_road_type'
+            elif col_name.startswith('舗装'):
+                return 'front_road_pavement'
+            elif col_name.startswith('区分') and col_name != '区分':
+                return 'other_road_category'
+            elif col_name.startswith('用途地域'):
+                return 'use_district'
+            elif col_name.startswith('高度地区'):
+                return 'height_district'
+            elif col_name.startswith('防火'):
+                return 'fire_prevention_area'
+            elif col_name.startswith('建蔽率'):
+                return 'coverage_ratio'
+            elif col_name.startswith('容積率'):
+                return 'floor_area_ratio'
+            elif col_name.startswith('都市計画区域'):
+                return 'city_planning_area'
+            elif col_name.startswith('森林法') or col_name.startswith('公園法'):
+                return 'forest_park_law'
+            elif col_name.startswith('鑑定評価書') and 'URL' not in col_name:
+                return 'appraisal_report'
+            elif col_name == '区分':
+                return 'category'
+            else:
+                return col_name.lower().replace(' ', '_')
+        
+        # カラム名を変換
+        column_mapping = {col: clean_column_name(col) for col in df.columns}
+        df = df.rename(columns=column_mapping)
+        
         try:
             cleaned_df = pd.DataFrame({
                 'year': year,
                 'prefecture_code': prefecture_code,
-                'category': df.iloc[:, 0],  # 区分
-                'reference_number': df.iloc[:, 1],  # 標準地番号
-                'survey_date': df.iloc[:, 2].apply(parse_survey_date),  # 調査基準日
-                'location': df.iloc[:, 3],  # 所在及び地番
-                'residential_address': df.iloc[:, 4],  # 住居表示
-                'price_per_sqm': df.iloc[:, 5].apply(clean_price),  # 価格(円/㎡)
-                'station_name': df.iloc[:, 6],  # 駅名称
-                'station_distance': df.iloc[:, 7].apply(clean_distance),  # 距離
-                'land_area': df.iloc[:, 8].apply(clean_area),  # 地積(㎡)
-                'land_shape': df.iloc[:, 9],  # 形状
-                'land_use_category': df.iloc[:, 10],  # 利用区分
-                'building_structure': df.iloc[:, 11],  # 構造
-                'building_floors': df.iloc[:, 12],  # 階層
-                'current_use': df.iloc[:, 13],  # 利用現況
-                'utilities': df.iloc[:, 14],  # 給排水等状況
-                'surrounding_use': df.iloc[:, 15],  # 周辺の土地の利用概況
-                'front_road_direction': df.iloc[:, 16],  # 前面道路：方位
-                'front_road_width': df.iloc[:, 17].apply(clean_width),  # 前面道路：幅員
-                'front_road_type': df.iloc[:, 18],  # 前面道路：種類
-                'front_road_pavement': df.iloc[:, 19],  # 前面道路：舗装
-                'other_road_direction': df.iloc[:, 20] if df.shape[1] > 20 else None,  # その他接面道路：方位
-                'other_road_category': df.iloc[:, 21] if df.shape[1] > 21 else None,  # その他接面道路：区分
-                'use_district': df.iloc[:, 22] if df.shape[1] > 22 else None,  # 用途地域等
-                'height_district': df.iloc[:, 23] if df.shape[1] > 23 else None,  # 高度地区
-                'fire_prevention_area': df.iloc[:, 24] if df.shape[1] > 24 else None,  # 防火・準防火
-                'coverage_ratio': df.iloc[:, 25].apply(clean_ratio) if df.shape[1] > 25 else None,  # 建蔽率(%)
-                'floor_area_ratio': df.iloc[:, 26].apply(clean_ratio) if df.shape[1] > 26 else None,  # 容積率(%)
-                'city_planning_area': df.iloc[:, 27] if df.shape[1] > 27 else None,  # 都市計画区域区分
-                'forest_park_law': df.iloc[:, 28] if df.shape[1] > 28 else None,  # 森林法等
-                'appraisal_report': df.iloc[:, 29] if df.shape[1] > 29 else None,  # 鑑定評価書
-                'appraisal_report_url': df.iloc[:, 30] if df.shape[1] > 30 and '鑑定評価書URL' in df.columns[-1] else None  # 鑑定評価書URL
+                'category': df['category'],
+                'reference_number': df['reference_number'].apply(clean_reference_number),
+                'survey_date': df['survey_date'].apply(parse_survey_date),
+                'location': df['location'],
+                'residential_address': df['residential_address'],
+                'price_per_sqm': df['price_per_sqm'].apply(clean_price),
+                'station_name': df['station_name'],
+                'station_distance': df['station_distance'].apply(clean_distance),
+                'land_area': df['land_area'].apply(clean_area),
+                'land_shape': df['land_shape'],
+                'land_use_category': df['land_use_category'],
+                'building_structure': df['building_structure'],
+                'building_floors': df['building_floors'],
+                'current_use': df['current_use'],
+                'utilities': df['utilities'],
+                'surrounding_use': df['surrounding_use'],
+                'front_road_direction': df['front_road_direction'],
+                'front_road_width': df['front_road_width'].apply(clean_width),
+                'front_road_type': df['front_road_type'],
+                'front_road_pavement': df['front_road_pavement'],
+                'other_road_direction': df.get('other_road_direction'),
+                'other_road_category': df.get('other_road_category'),
+                'use_district': df.get('use_district'),
+                'height_district': df.get('height_district'),
+                'fire_prevention_area': df.get('fire_prevention_area'),
+                'coverage_ratio': df['coverage_ratio'].apply(clean_ratio) if 'coverage_ratio' in df.columns else None,
+                'floor_area_ratio': df['floor_area_ratio'].apply(clean_ratio) if 'floor_area_ratio' in df.columns else None,
+                'city_planning_area': df.get('city_planning_area'),
+                'forest_park_law': df.get('forest_park_law'),
+                'appraisal_report': df.get('appraisal_report'),
+                'appraisal_report_url': df.get('鑑定評価書URL')
             })
             
             LOGGER.info(f"  {csv_file}: {len(cleaned_df)}行をクレンジング完了")
@@ -827,14 +913,14 @@ if __name__ == "__main__":
   
   # Land データ（地価公示・地価調査）のDB投入
   python reinfolib.py uploadland                        # ドライラン
-  python reinfolib.py uploadland --update                # DB更新（※未実装）
+  python reinfolib.py uploadland --update                # DB更新
 
 =================================================================
 注意事項:
   - estate: ZIPファイルをダウンロード（四半期ごと、全国一括）
   - land: CSVファイルを生成（年度ごと、都道府県別）
   - uploadestate: estateデータ（ZIPファイル）のDB投入
-  - uploadland: landデータ（CSVファイル）のDB投入（※未実装）
+  - uploadland: landデータ（CSVファイル）のDB投入
   - データベース更新時は --update フラグが必須（安全のため）
   - 大量データ取得時はヘッドレスモード推奨（--headless）
   - ダウンロード済みファイルは再取得しません（既存ファイルチェック）
