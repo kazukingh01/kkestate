@@ -678,8 +678,12 @@ def get_processing_stats(db: DBConnector) -> Dict[str, int]:
         統計情報辞書
     """
     try:
-        # 成功したRUN総数
-        total_sql = "SELECT COUNT(*) as count FROM estate_run WHERE is_success = true"
+        # クレンジング対象データが存在するRUN総数
+        total_sql = """
+        SELECT COUNT(DISTINCT d.id_run) as count
+        FROM estate_detail d
+        WHERE d.id_key IN (SELECT id FROM estate_mst_key WHERE id_cleaned IS NOT NULL)
+        """
         total_result = db.select_sql(total_sql)
         total_runs = total_result.iloc[0]['count'] if not total_result.empty else 0
         

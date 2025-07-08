@@ -392,12 +392,213 @@ def upload_land_to_db(download_dir: str = "./downloads", update: bool = False):
         update: データベース更新を実行するか
     """
     LOGGER.info(f"Landデータのデータベースアップロード開始: {download_dir}")
-    LOGGER.error("Land データのアップロード機能は未実装です", color=["BOLD", "RED"])
-    # TODO: 実装予定
-    # - reinfolib_land_YYYY_PP.csv形式のファイルを読み込み
-    # - 適切なテーブル構造へ変換
-    # - reinfolib_landテーブルへ投入
-    raise NotImplementedError("Land データのアップロード機能は未実装です")
+    
+    # データベース接続
+    DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
+    
+    # reinfolib_land_*.csv ファイルを探す
+    csv_files = [f for f in os.listdir(download_dir) if f.startswith('reinfolib_land_') and f.endswith('.csv')]
+    
+    if not csv_files:
+        LOGGER.warning(f"{download_dir} にreinfolib_land_*.csvファイルが見つかりません")
+        return
+    
+    LOGGER.info(f"{len(csv_files)}個のCSVファイルを処理します")
+    
+    success_count = 0
+    failed_count = 0
+    
+    for csv_file in sorted(csv_files):
+        # ファイル名からyearとprefecture_codeを抽出 (reinfolib_land_YYYY_PP.csv)
+        match = re.match(r'reinfolib_land_(\d{4})_(\d{2})\.csv', csv_file)
+        if not match:
+            LOGGER.warning(f"ファイル名が不正です: {csv_file}")
+            failed_count += 1
+            continue
+        
+        year = int(match.group(1))
+        prefecture_code = match.group(2)
+        
+        LOGGER.info(f"処理中: {csv_file} (Year: {year}, Prefecture: {prefecture_code})")
+        
+        csv_path = os.path.join(download_dir, csv_file)
+        
+        # CSVを読み込み（UTF-8 with BOM）
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig', skiprows=1)
+        except pd.errors.EmptyDataError:
+            LOGGER.warning(f"{csv_file}: 空のCSVファイル")
+            failed_count += 1
+            continue
+        except Exception as e:
+            LOGGER.error(f"{csv_file}: 読み込みエラー: {e}")
+            failed_count += 1
+            continue
+        
+        # 空のDataFrameの場合はスキップ
+        if df.empty:
+            LOGGER.info(f"{csv_file}: データなし")
+            failed_count += 1
+            continue
+        
+        # データクレンジング関数
+        def clean_price(price_str):
+            """価格データをクレンジング（241,000(円/㎡) -> 241000）"""
+            if pd.isna(price_str):
+                return None
+            price_str = str(price_str).replace(',', '').replace('(円/㎡)', '').replace('(円/10a)', '')
+            try:
+                return int(price_str)
+            except:
+                return None
+        
+        def clean_distance(distance_str):
+            """距離データをクレンジング（1,300m -> 1300、近接 -> 0、接面 -> -1）"""
+            if pd.isna(distance_str):
+                return None
+            distance_str = str(distance_str)
+            if '近接' in distance_str:
+                return 0
+            elif '接面' in distance_str:
+                return -1
+            elif '駅前広場接面' in distance_str:
+                return -2
+            else:
+                # 数値部分を抽出
+                distance_str = distance_str.replace(',', '').replace('m', '').replace('ｍ', '')
+                try:
+                    return int(distance_str)
+                except:
+                    return None
+        
+        def clean_area(area_str):
+            """地積データをクレンジング（101(㎡) -> 101）"""
+            if pd.isna(area_str):
+                return None
+            area_str = str(area_str).replace('(㎡)', '').replace(',', '')
+            try:
+                return int(area_str)
+            except:
+                return None
+        
+        def clean_width(width_str):
+            """幅員データをクレンジング（4.0m -> 4.0）"""
+            if pd.isna(width_str):
+                return None
+            width_str = str(width_str).replace('m', '').replace('ｍ', '').replace(',', '')
+            try:
+                return float(width_str)
+            except:
+                return None
+        
+        def clean_ratio(ratio_str):
+            """建蔽率・容積率をクレンジング（60(%) -> 60）"""
+            if pd.isna(ratio_str):
+                return None
+            ratio_str = str(ratio_str).replace('(%)', '').replace(',', '')
+            try:
+                return int(ratio_str)
+            except:
+                return None
+        
+        def parse_survey_date(date_str):
+            """調査基準日をパース（令和6年7月1日 -> 2024-07-01）"""
+            if pd.isna(date_str):
+                return None
+            # 令和、平成、昭和の変換
+            import datetime
+            date_str = str(date_str)
+            
+            # 令和の場合
+            if '令和' in date_str:
+                match = re.match(r'令和(\d+)年(\d+)月(\d+)日', date_str)
+                if match:
+                    year = 2018 + int(match.group(1))  # 令和元年 = 2019
+                    month = int(match.group(2))
+                    day = int(match.group(3))
+                    return datetime.date(year, month, day)
+            # 平成の場合
+            elif '平成' in date_str:
+                match = re.match(r'平成(\d+)年(\d+)月(\d+)日', date_str)
+                if match:
+                    year = 1988 + int(match.group(1))  # 平成元年 = 1989
+                    month = int(match.group(2))
+                    day = int(match.group(3))
+                    return datetime.date(year, month, day)
+            # 昭和の場合
+            elif '昭和' in date_str:
+                match = re.match(r'昭和(\d+)年(\d+)月(\d+)日', date_str)
+                if match:
+                    year = 1925 + int(match.group(1))  # 昭和元年 = 1926
+                    month = int(match.group(2))
+                    day = int(match.group(3))
+                    return datetime.date(year, month, day)
+            
+            return None
+        
+        # カラムマッピング（長いカラム名を適切な名前に）
+        # カラムインデックスで参照（カラム名が長すぎるため）
+        try:
+            cleaned_df = pd.DataFrame({
+                'year': year,
+                'prefecture_code': prefecture_code,
+                'category': df.iloc[:, 0],  # 区分
+                'reference_number': df.iloc[:, 1],  # 標準地番号
+                'survey_date': df.iloc[:, 2].apply(parse_survey_date),  # 調査基準日
+                'location': df.iloc[:, 3],  # 所在及び地番
+                'residential_address': df.iloc[:, 4],  # 住居表示
+                'price_per_sqm': df.iloc[:, 5].apply(clean_price),  # 価格(円/㎡)
+                'station_name': df.iloc[:, 6],  # 駅名称
+                'station_distance': df.iloc[:, 7].apply(clean_distance),  # 距離
+                'land_area': df.iloc[:, 8].apply(clean_area),  # 地積(㎡)
+                'land_shape': df.iloc[:, 9],  # 形状
+                'land_use_category': df.iloc[:, 10],  # 利用区分
+                'building_structure': df.iloc[:, 11],  # 構造
+                'building_floors': df.iloc[:, 12],  # 階層
+                'current_use': df.iloc[:, 13],  # 利用現況
+                'utilities': df.iloc[:, 14],  # 給排水等状況
+                'surrounding_use': df.iloc[:, 15],  # 周辺の土地の利用概況
+                'front_road_direction': df.iloc[:, 16],  # 前面道路：方位
+                'front_road_width': df.iloc[:, 17].apply(clean_width),  # 前面道路：幅員
+                'front_road_type': df.iloc[:, 18],  # 前面道路：種類
+                'front_road_pavement': df.iloc[:, 19],  # 前面道路：舗装
+                'other_road_direction': df.iloc[:, 20] if df.shape[1] > 20 else None,  # その他接面道路：方位
+                'other_road_category': df.iloc[:, 21] if df.shape[1] > 21 else None,  # その他接面道路：区分
+                'use_district': df.iloc[:, 22] if df.shape[1] > 22 else None,  # 用途地域等
+                'height_district': df.iloc[:, 23] if df.shape[1] > 23 else None,  # 高度地区
+                'fire_prevention_area': df.iloc[:, 24] if df.shape[1] > 24 else None,  # 防火・準防火
+                'coverage_ratio': df.iloc[:, 25].apply(clean_ratio) if df.shape[1] > 25 else None,  # 建蔽率(%)
+                'floor_area_ratio': df.iloc[:, 26].apply(clean_ratio) if df.shape[1] > 26 else None,  # 容積率(%)
+                'city_planning_area': df.iloc[:, 27] if df.shape[1] > 27 else None,  # 都市計画区域区分
+                'forest_park_law': df.iloc[:, 28] if df.shape[1] > 28 else None,  # 森林法等
+                'appraisal_report': df.iloc[:, 29] if df.shape[1] > 29 else None,  # 鑑定評価書
+                'appraisal_report_url': df.iloc[:, 30] if df.shape[1] > 30 and '鑑定評価書URL' in df.columns[-1] else None  # 鑑定評価書URL
+            })
+            
+            LOGGER.info(f"  {csv_file}: {len(cleaned_df)}行をクレンジング完了")
+            
+            if update:
+                # 既存データを削除
+                delete_sql = f"DELETE FROM reinfolib_land WHERE year = {year} AND prefecture_code = '{prefecture_code}'"
+                DB.set_sql(delete_sql)
+                LOGGER.info(f"  既存データ削除: year={year}, prefecture_code={prefecture_code}")
+                
+                # 新データを挿入
+                DB.insert_from_df(cleaned_df, 'reinfolib_land', is_select=False, set_sql=True)
+                DB.execute_sql()
+                LOGGER.info(f"  データベース挿入完了: {len(cleaned_df)}行", color=["BOLD", "GREEN"])
+            else:
+                LOGGER.info(f"  [ドライラン] データベース挿入をスキップ")
+            
+            success_count += 1
+            
+        except Exception as e:
+            LOGGER.error(f"  {csv_file}: 処理エラー: {e}")
+            failed_count += 1
+    
+    LOGGER.info(f"\n=== アップロード完了 ===")
+    LOGGER.info(f"成功: {success_count} ファイル")
+    LOGGER.info(f"失敗: {failed_count} ファイル")
 
 
 def upload_estate_to_db(download_dir: str = "./downloads", update: bool = False):
@@ -514,6 +715,29 @@ def upload_estate_to_db(download_dir: str = "./downloads", update: bool = False)
                 df['year'] = year
                 df['period'] = period
                 df['prefecture_code'] = prefecture_code
+                
+                # building_year のクレンジング（「1989年」-> 1989）
+                def clean_building_year(year_str):
+                    """建築年をクレンジング（1989年 -> 1989, 戦前 -> 1944）"""
+                    if pd.isna(year_str):
+                        return None
+                    year_str = str(year_str).replace('年', '').replace('頃', '').strip()
+                    # 戦前の場合は1944年とする（昭和19年、終戦前年）
+                    if '戦前' in year_str:
+                        return 1944
+                    # 年代範囲の場合（例: 1980年代前半）
+                    if '年代' in year_str:
+                        match = re.search(r'(\d{4})', year_str)
+                        if match:
+                            return int(match.group(1))
+                    # 通常の年の場合
+                    match = re.search(r'(\d{4})', year_str)
+                    if match:
+                        return int(match.group(1))
+                    return None
+                
+                if 'building_year' in df.columns:
+                    df['building_year'] = df['building_year'].apply(clean_building_year)
                 
                 # 数値型の変換とクリーニング
                 numeric_columns = ['nearest_station_distance', 'transaction_price', 'price_per_tsubo', 

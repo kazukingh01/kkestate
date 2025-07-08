@@ -84,6 +84,8 @@ pip install -e ~/kkestate/
 ```bash
 cp ~/kkestate/main/database/schema.collect.sql /home/share/
 cp ~/kkestate/main/database/schema.process.sql /home/share/
+cp ~/kkestate/main/database/view.sql           /home/share/
+cp ~/kkestate/main/database/schema.reinfolib.sql /home/share/
 ```
 
 ### Database
@@ -102,8 +104,10 @@ see: [Install ( Docker Hub Base )](https://github.com/kazukingh01/kkpsgre/tree/8
 ```bash
 sudo docker exec --user=postgres postgres dropdb estate
 sudo docker exec --user=postgres postgres createdb --encoding=UTF8 --locale=ja_JP.utf8 --template=template0 estate
-sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.collect.sql 
-sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.process.sql 
+sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.collect.sql
+sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.process.sql
+sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.reinfolib.sql
+sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/view.sql
 ```
 
 ##### Restore Database
