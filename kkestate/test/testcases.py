@@ -608,8 +608,8 @@ EXPECTED_KEY_PROCESSING = [
     },
     {
         "key_name": "住所",
-        "expected_cleaned_name": "住所",
-        "expected_function": clean_address_to_json,
+        "expected_cleaned_name": None,
+        "expected_function": clean_force_null_to_json,
     },
     {
         "key_name": "関連リンク",

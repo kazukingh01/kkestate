@@ -137,7 +137,6 @@ def map_key_to_processing_info(key_name: str) -> Tuple[str, Callable]:
     key_function_mapping = {
         # 住所関連 -> clean_address_to_json
         "所在地": ("住所", clean_address_to_json),
-        "住所": ("住所", clean_address_to_json),
         "物件所在地": ("住所", clean_address_to_json),
         "現地案内所": ("住所", clean_address_to_json),
         "モデルルーム": ("住所", clean_address_to_json),
@@ -239,6 +238,7 @@ def map_key_to_processing_info(key_name: str) -> Tuple[str, Callable]:
         
         # 強制null処理 -> clean_force_null_to_json (期待値でNoneとされている項目)
         "敷地権利形態": ("敷地権利形態", clean_force_null_to_json),
+        "住所": (None, clean_force_null_to_json), # '所在地'が全ての id_run でカバーされている
         "敷地の権利形態": (None, clean_force_null_to_json),
         "土地の権利形態": (None, clean_force_null_to_json),
         "販売スケジュール": (None, clean_force_null_to_json),
