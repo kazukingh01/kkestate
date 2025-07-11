@@ -99,7 +99,7 @@ flowchart LR
   end
 
   %% Files
-  subgraph Processes["Files"]
+  subgraph Files["Files"]
     F1["reinfolib_estate_YYYY_P.zip"]
     F2["reinfolib_land_YYYY_XX.csv"]
   end
