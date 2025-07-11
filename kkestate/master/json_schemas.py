@@ -5,19 +5,13 @@ __all__ = [
 
 SCHEMAS = {
     "住所": {
-        "base_type": "structured_address",
-        "required_fields": ["raw"],
-        "optional_fields": ["prefecture", "secondary_division", "secondary_type", "tertiary_division", "tertiary_type", "remaining", "hierarchy", "division_types"],
+        "base_type": "simple_address",
+        "required_fields": ["location", "citycode"],
+        "optional_fields": ["period"],
         "field_types": {
-            "raw": str,
-            "prefecture": [str, type(None)],
-            "secondary_division": [str, type(None)],
-            "secondary_type": [str, type(None)],
-            "tertiary_division": [str, type(None)],
-            "tertiary_type": [str, type(None)],
-            "remaining": [str, type(None)],
-            "hierarchy": [str, type(None)],
-            "division_types": [str, type(None)]
+            "location": [str, type(None)],
+            "citycode": [str, type(None)],
+            "period": [int, type(None)]
         }
     },
     "交通": {

@@ -13,7 +13,7 @@ from .json_cleaner import (
     clean_price_band_to_json, clean_other_expenses_to_json, 
     clean_multiple_area_to_json, clean_restrictions_to_json, 
     clean_expiry_date_to_json, clean_company_info_to_json, 
-    clean_delivery_date_to_json, clean_address_to_json, 
+    clean_delivery_date_to_json, clean_address_to_json, clean_address_simple_to_json,
     clean_utility_cost_to_json, clean_feature_pickup_to_json, 
     clean_reform_to_json, clean_building_structure_to_json, 
     clean_parking_to_json, clean_surrounding_facilities_to_json,
@@ -135,11 +135,11 @@ def map_key_to_processing_info(key_name: str) -> Tuple[str, Callable]:
     
     # 確定的なマッピング定義
     key_function_mapping = {
-        # 住所関連 -> clean_address_to_json
-        "所在地": ("住所", clean_address_to_json),
-        "物件所在地": ("住所", clean_address_to_json),
-        "現地案内所": ("住所", clean_address_to_json),
-        "モデルルーム": ("住所", clean_address_to_json),
+        # 住所関連 -> clean_address_simple_to_json
+        "所在地": ("住所", clean_address_simple_to_json),
+        "物件所在地": ("住所", clean_address_simple_to_json),
+        "現地案内所": ("住所", clean_address_simple_to_json),
+        "モデルルーム": ("住所", clean_address_simple_to_json),
         
         # 交通関連 -> clean_access_to_json
         "交通": ("交通", clean_access_to_json),  # 期待値に合わせて "交通アクセス" -> "交通" に変更

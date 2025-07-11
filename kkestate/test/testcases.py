@@ -1,5 +1,5 @@
 from kkestate.util.json_cleaner import (
-    clean_address_to_json, clean_access_to_json, clean_units_to_json,
+    clean_address_to_json, clean_address_simple_to_json, clean_access_to_json, clean_units_to_json,
     clean_zoning_to_json, clean_force_null_to_json, clean_date_to_json,
     clean_delivery_date_to_json, clean_price_to_json, clean_management_fee_to_json,
     clean_other_expenses_to_json, clean_layout_to_json, clean_area_to_json,
@@ -14,6 +14,7 @@ from kkestate.util.json_cleaner import (
 __all__ = [
     "EXPECTED_KEY_PROCESSING",
     "TEST_CASES_ADDRESS",
+    "TEST_CASES_ADDRESS_SIMPLE",
     "TEST_CASES_ACCESS",
     "TEST_CASES_UNITS1",
     "TEST_CASES_UNITS2",
@@ -59,7 +60,7 @@ EXPECTED_KEY_PROCESSING = [
     {
         "key_name": "所在地",
         "expected_cleaned_name": "住所",
-        "expected_function": clean_address_to_json,
+        "expected_function": clean_address_simple_to_json,
     },
     {
         "key_name": "交通",
@@ -1747,6 +1748,18 @@ TEST_CASES_ADDRESS = [
     {"input": "岐阜県可児市土田", "expected": {"raw": "岐阜県可児市土田", "prefecture": "岐阜県", "secondary_division": "可児市", "secondary_type": "市", "tertiary_division": None, "tertiary_type": None, "remaining": "土田", "hierarchy": "岐阜県 -> 可児市", "division_types": "市"}}
 ]
 
+TEST_CASES_ADDRESS_SIMPLE = [
+    {"input": "北海道札幌市北区北十七条西２-21-555、21-545、21-546の内／ノーステラス（地番）、北海道札幌市北区北十七条西２-21-546の内、21-801／サウステラス", "expected": {"location": "北海道札幌市北区北十七条西２-21-555", "citycode": "01102"}},
+    {"input": "北海道札幌市豊平区月寒中央通１０-179-20（地番）", "expected": {"location": "北海道札幌市豊平区月寒中央通１０-179-20", "citycode": "01105"}},
+    {"input": "北海道北広島市栄町２-1（地番）", "expected": {"location": "北海道北広島市栄町２-1", "citycode": "01234"}},
+    {"input": "北海道札幌市豊平区中の島一条３-1-4（エアリー・地番）、2-1（ブライト・地番）", "expected": {"location": "北海道札幌市豊平区中の島一条３-1-4", "citycode": "01105"}},
+    {"input": "北海道千歳市文京１", "expected": {"location": "北海道千歳市文京１", "citycode": "01224"}},
+    {"input": "北海道札幌市中央区南十二条西１５丁目4-25-205号室【角部屋】", "expected": {"location": "北海道札幌市中央区南十二条西１５丁目4-25-205号室", "citycode": "01101"}},
+    {"input": "北海道札幌市中央区南6条西16-1-11（住居表示）、北海道札幌市中央区南六条西１６-1344-9（地番）", "expected": {'location': '北海道札幌市中央区南六条西１６-1344-9', 'citycode': '01101'}},
+    {"input": "北海道札幌市豊平区平岸三条１４-68・72・73（地番）", "expected": {'location': '北海道札幌市豊平区平岸三条１４-68', 'citycode': '01105'}}
+]
+
+
 TEST_CASES_ACCESS = [
     {"input": "ＪＲ阪和線「新家」歩5分\t[乗り換え案内]", "expected": {"routes": [{"line": "ＪＲ阪和線", "station": "新家", "method": "歩", "time": 5}]}},
     {"input": "ＪＲ東海道本線「灘」歩6分\t[乗り換え案内]\t阪急神戸線「王子公園」歩10分\t[乗り換え案内]\t阪神本線「岩屋」歩10分\t[乗り換え案内]", "expected": {"routes": [{"line": "ＪＲ東海道本線", "station": "灘", "method": "歩", "time": 6}, {"line": "阪急神戸線", "station": "王子公園", "method": "歩", "time": 10}, {"line": "阪神本線", "station": "岩屋", "method": "歩", "time": 10}]}},
@@ -2319,6 +2332,7 @@ TEST_CASES_BUILDING_COVERAGE = [
 TEST_MAPPING = [
     # 住所関連
     ("TEST_CASES_ADDRESS", TEST_CASES_ADDRESS, clean_address_to_json),
+    ("TEST_CASES_ADDRESS_SIMPLE", TEST_CASES_ADDRESS_SIMPLE, clean_address_simple_to_json),
     
     # 交通関連
     ("TEST_CASES_ACCESS", TEST_CASES_ACCESS, clean_access_to_json),

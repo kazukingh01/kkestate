@@ -4,6 +4,8 @@ estate_detailの生データをJSONオブジェクトに変換
 """
 
 import re
+import csv
+import os
 from typing import Dict, Any, Optional, List, Tuple
 from .parser import (
     parse_address_structure,
@@ -20,6 +22,36 @@ from .parser import (
     get_structure_analysis_schema,
     get_reform_analysis_schema
 )
+
+# citycode.csvからマッピング辞書を作成（グローバル変数）
+_CITYCODE_MAP = None
+
+def _load_citycode_map():
+    """citycode.csvを読み込んでマッピング辞書を作成"""
+    global _CITYCODE_MAP
+    if _CITYCODE_MAP is not None:
+        return _CITYCODE_MAP
+    
+    _CITYCODE_MAP = {}
+    citycode_path = os.path.join(os.path.dirname(__file__), "../master/citycode.csv")
+    
+    if os.path.exists(citycode_path):
+        try:
+            with open(citycode_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) >= 6:
+                        citycode = row[0].strip('"')
+                        city_name = row[1].strip('"')
+                        pref_name = row[5].strip('"')
+                        
+                        # 都道府県名+市区町村名をキーにしてcitycodeをマッピング
+                        full_name = pref_name + city_name
+                        _CITYCODE_MAP[full_name] = citycode
+        except Exception:
+            pass
+    
+    return _CITYCODE_MAP
 
 def _should_nullify_text(value: str) -> bool:
     """
@@ -2267,6 +2299,145 @@ def clean_address_to_json(value: str, raw_key: str = "", period: Optional[int] =
         result["period"] = period
     
     return result
+
+def clean_address_simple_to_json(value: str, raw_key: str = "", period: Optional[int] = None) -> Dict[str, Any]:
+    """
+    住所情報をシンプルなJSON形式でクレンジング
+    location（クリーニング済み住所）とcitycode（先頭一致）の2項目のみ
+    
+    Args:
+        value (str): 住所の生データ
+        raw_key (str): 元のキー名
+        period (Optional[int]): 期別情報
+        
+    Returns:
+        Dict[str, Any]: {"location": クリーニング済み住所, "citycode": コード}
+    """
+    if not value or value.strip() == "" or _should_nullify_text(value.strip()):
+        result = {"location": None, "citycode": None}
+        if period is not None:
+            result["period"] = period
+        return result
+    
+    # 住所をクリーニング
+    cleaned_address = _clean_address_string(value.strip())
+    
+    result = {
+        "location": cleaned_address,
+        "citycode": _get_citycode_from_address(cleaned_address)
+    }
+    
+    if period is not None:
+        result["period"] = period
+    
+    return result
+
+def _clean_address_string(address: str) -> str:
+    """
+    住所文字列をクリーニング
+    
+    処理内容:
+    1. 複数住所がある場合は地番を優先、なければ最初の住所を取得
+    2. 住所番号の「・」区切りがある場合は最初の番号のみ取得
+    3. 括弧内の付加情報を除去（地番）、【角部屋】など
+    4. 不要な記号や空白の整理
+    
+    Args:
+        address (str): 住所の生データ
+        
+    Returns:
+        str: クリーニング済み住所
+    """
+    if not address:
+        return address
+    
+    import re
+    
+    # 1. 複数住所の分離（「、」で区切り）
+    address_parts = [part.strip() for part in address.split('、')]
+    
+    # 地番優先ロジック: 「（地番）」を含む住所で完全な住所があれば優先
+    selected_address = address_parts[0]  # デフォルトは最初の住所
+    for part in address_parts:
+        if '（地番）' in part or '地番' in part:
+            # 地番表記があり、かつ都道府県名を含む完全な住所の場合のみ優先
+            if any(pref in part for pref in ['北海道', '県', '府', '都']):
+                selected_address = part
+                break
+    
+    # 2. 「／」で区切られた情報がある場合は最初の部分を取得
+    selected_address = selected_address.split('／')[0].strip()
+    
+    # 3. 住所番号の「・」分割処理（番地部分のみ）
+    # 例: 「平岸三条１４-68・72・73」→「平岸三条１４-68」
+    if '・' in selected_address:
+        # 「・」で分割されている番号の最初の部分のみ取得
+        selected_address = re.sub(r'・[\d・]+', '', selected_address)
+    
+    # 4. 括弧内情報の除去
+    # 丸括弧の除去: （地番）、（エアリー・地番）など
+    selected_address = re.sub(r'（[^）]*）', '', selected_address)
+    
+    # 角括弧の除去: 【角部屋】など
+    selected_address = re.sub(r'【[^】]*】', '', selected_address)
+    
+    # 5. 不要な空白や記号の整理
+    selected_address = re.sub(r'\s+', '', selected_address)  # 連続する空白を削除
+    selected_address = selected_address.strip()
+    
+    return selected_address
+
+def _get_citycode_from_address(address: str) -> Optional[str]:
+    """
+    住所文字列からcitycodeを取得
+    都道府県名+市区町村名で先頭一致検索
+    
+    Args:
+        address (str): 住所文字列
+        
+    Returns:
+        Optional[str]: 見つかったcitycode、見つからない場合はNone
+    """
+    citycode_map = _load_citycode_map()
+    
+    # 最長一致でcitycodeを検索
+    best_match = ""
+    best_citycode = None
+    
+    for full_name, citycode in citycode_map.items():
+        if address.startswith(full_name) and len(full_name) > len(best_match):
+            best_match = full_name
+            best_citycode = citycode
+    
+    return best_citycode
+
+def generate_address_simple_type_schema() -> Dict[str, Any]:
+    """
+    シンプルな住所データ用のtype定義を生成
+    
+    Returns:
+        Dict[str, Any]: シンプルな住所データ用のtype情報
+    """
+    return {
+        "base_type": "simple_address",
+        "data_type": "object",
+        "required_fields": ["location", "citycode"],
+        "optional_fields": ["period"],
+        "field_definitions": {
+            "location": {
+                "type": "string", 
+                "description": "住所の生データ（location値）"
+            },
+            "citycode": {
+                "type": "string", 
+                "description": "市区町村コード（5桁）"
+            },
+            "period": {
+                "type": "integer", 
+                "description": "期別情報（第X期）"
+            }
+        }
+    }
 
 def generate_address_type_schema() -> Dict[str, Any]:
     """
