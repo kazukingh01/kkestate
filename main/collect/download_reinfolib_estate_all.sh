@@ -1,7 +1,13 @@
 #!/bin/bash
 
-# REINFOLIBから全期間のデータをダウンロードするスクリプト
-# 2006年第1四半期から2024年第4四半期まで
+# REINFOLIBから指定期間のデータをダウンロードするスクリプト
+# 使用方法: ./download_reinfolib_estate_all.sh [year_from] [year_to]
+# 例: ./download_reinfolib_estate_all.sh 2020 2024
+# 引数を省略した場合: 2006年から2024年まで
+
+# 引数処理
+YEAR_FROM=${1:-2006}
+YEAR_TO=${2:-2024}
 
 # 設定
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,7 +50,30 @@ download_with_retry() {
 
 # メイン処理
 main() {
+    # 引数のバリデーション
+    if ! [[ "$YEAR_FROM" =~ ^[0-9]{4}$ ]] || ! [[ "$YEAR_TO" =~ ^[0-9]{4}$ ]]; then
+        log "ERROR: 年度は4桁の数字で指定してください"
+        exit 1
+    fi
+    
+    if [ "$YEAR_FROM" -gt "$YEAR_TO" ]; then
+        log "ERROR: year_from は year_to 以下である必要があります"
+        exit 1
+    fi
+    
+    if [ "$YEAR_FROM" -lt 2006 ]; then
+        log "WARNING: 2006年より前のデータは存在しません. 2006年から開始します"
+        YEAR_FROM=2006
+    fi
+    
+    # YEAR_FROM修正後の再チェック
+    if [ "$YEAR_FROM" -gt "$YEAR_TO" ]; then
+        log "ERROR: 修正後のyear_from(${YEAR_FROM})がyear_to(${YEAR_TO})より大きくなりました"
+        exit 1
+    fi
+    
     log "=== REINFOLIB Download Start ==="
+    log "期間: ${YEAR_FROM}年 から ${YEAR_TO}年"
     
     # ダウンロードディレクトリ作成
     mkdir -p "$DOWNLOAD_DIR"
@@ -53,8 +82,8 @@ main() {
     success_count=0
     failed_count=0
     
-    # 2006年から2024年まで処理
-    for year in $(seq 2006 2024); do
+    # 指定された年度範囲で処理
+    for year in $(seq $YEAR_FROM $YEAR_TO); do
         for period in 1 2 3 4; do
             
             # 既にダウンロード済みファイルが存在する場合はスキップ
@@ -84,6 +113,27 @@ main() {
         exit 1
     fi
 }
+
+# 使用方法表示
+usage() {
+    echo "Usage: $0 [year_from] [year_to]"
+    echo "  指定された期間の不動産取引価格データを一括取得"
+    echo ""
+    echo "Arguments:"
+    echo "  year_from  開始年度 (デフォルト: 2006)"
+    echo "  year_to    終了年度 (デフォルト: 2024)"
+    echo ""
+    echo "Example:"
+    echo "  $0                # 2006-2024年のデータを取得"
+    echo "  $0 2020           # 2020-2024年のデータを取得"
+    echo "  $0 2020 2023      # 2020-2023年のデータを取得"
+}
+
+# 引数チェック
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    usage
+    exit 0
+fi
 
 # 実行
 main

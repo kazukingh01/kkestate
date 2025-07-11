@@ -11,6 +11,7 @@ flowchart RL
     %% nodes
     CRON[CRON]
     SUUMO[SUUMO]
+    ReinfoLib[ReinfoLib]
     DB[(DB)]
     COLLECT[COLLECT]
     PROCESS[PROCESS]
@@ -23,6 +24,7 @@ flowchart RL
     CRON -->|run| ANALYZE
 
     COLLECT -->|scraping| SUUMO
+    COLLECT -->|download| ReinfoLib
 
     COLLECT -->|write| DB
     DB -. read .-> COLLECT
@@ -82,10 +84,11 @@ pip install -e ~/kkestate/
 ##### Copy files
 
 ```bash
-cp ~/kkestate/main/database/schema.collect.sql /home/share/
-cp ~/kkestate/main/database/schema.process.sql /home/share/
-cp ~/kkestate/main/database/view.sql           /home/share/
+cp ~/kkestate/main/database/schema.collect.sql   /home/share/
+cp ~/kkestate/main/database/schema.process.sql   /home/share/
 cp ~/kkestate/main/database/schema.reinfolib.sql /home/share/
+cp ~/kkestate/main/database/schema.location.sql  /home/share/
+cp ~/kkestate/main/database/view.sql             /home/share/
 ```
 
 ### Database
@@ -107,6 +110,7 @@ sudo docker exec --user=postgres postgres createdb --encoding=UTF8 --locale=ja_J
 sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.collect.sql
 sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.process.sql
 sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.reinfolib.sql
+sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/schema.location.sql
 sudo docker exec --user=postgres postgres psql -U postgres -d estate -f /home/share/view.sql
 ```
 
@@ -136,18 +140,18 @@ cat ~/kkestate/main/others/crontab | sudo tee -a /etc/crontab
 sudo /etc/init.d/cron restart
 ```
 
-# [ function ] Collect
+# [ Feature ] Collect
 
 see: [README](./main/collect/README.md)
 
-# [ function ] Process
+# [ Feature ] Process
 
 see: [README](./main/process/README.md)
 
-# [ function ] Analyze
+# [ Feature ] Analyze
 
 see: [README](./main/analyze/README.md)
 
-# [ function ] Web
+# [ Feature ] Web
 
 see: [README](./main/web/README.md)

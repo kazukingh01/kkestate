@@ -1,7 +1,13 @@
 #!/bin/bash
 
 # REINFOLIBから地価公示・地価調査データをスクレイピングするスクリプト
-# 全都道府県（01-47）の1970-2024年データを一括取得
+# 使用方法: ./download_reinfolib_land_all.sh [year_from] [year_to]
+# 例: ./download_reinfolib_land_all.sh 2020 2024
+# 引数を省略した場合: 1970年から2024年まで
+
+# 引数処理
+YEAR_FROM=${1:-1970}
+YEAR_TO=${2:-2024}
 
 # 設定
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,8 +15,6 @@ PYTHON_SCRIPT="${SCRIPT_DIR}/reinfolib.py"
 DOWNLOAD_DIR="./downloads/"
 MAX_RETRY=3
 RETRY_WAIT=10
-START_YEAR=1970
-END_YEAR=2024
 
 # 都道府県コードと名前のマッピング
 declare -A PREFECTURE_NAMES=(
@@ -61,9 +65,31 @@ download_with_retry() {
 
 # メイン処理
 main() {
+    # 引数のバリデーション
+    if ! [[ "$YEAR_FROM" =~ ^[0-9]{4}$ ]] || ! [[ "$YEAR_TO" =~ ^[0-9]{4}$ ]]; then
+        log "ERROR: 年度は4桁の数字で指定してください"
+        exit 1
+    fi
+    
+    if [ "$YEAR_FROM" -gt "$YEAR_TO" ]; then
+        log "ERROR: year_from は year_to 以下である必要があります"
+        exit 1
+    fi
+    
+    if [ "$YEAR_FROM" -lt 1970 ]; then
+        log "WARNING: 1970年より前のデータは存在しません. 1970年から開始します"
+        YEAR_FROM=1970
+    fi
+    
+    # YEAR_FROM修正後の再チェック
+    if [ "$YEAR_FROM" -gt "$YEAR_TO" ]; then
+        log "ERROR: 修正後のyear_from(${YEAR_FROM})がyear_to(${YEAR_TO})より大きくなりました"
+        exit 1
+    fi
+    
     log "=== REINFOLIB Land Prices Download Start ==="
-    log "Target Years: ${START_YEAR}-${END_YEAR}"
-    log "Target Prefectures: 01-47 (全都道府県)"
+    log "期間: ${YEAR_FROM}年 から ${YEAR_TO}年"
+    log "対象都道府県: 01-47 (全都道府県)"
     
     # ダウンロードディレクトリ作成
     mkdir -p "$DOWNLOAD_DIR"
@@ -72,8 +98,8 @@ main() {
     total_success=0
     total_failed=0
     
-    # 1970年から2024年まで全年をループ
-    for year in $(seq $START_YEAR $END_YEAR); do
+    # 指定された年度範囲でループ
+    for year in $(seq $YEAR_FROM $YEAR_TO); do
         log "Processing Year: ${year}"
         year_success=0
         year_failed=0
@@ -116,11 +142,17 @@ main() {
 
 # 使用方法表示
 usage() {
-    echo "Usage: $0"
-    echo "  全都道府県の${START_YEAR}年-${END_YEAR}年の地価公示・地価調査データを一括取得"
+    echo "Usage: $0 [year_from] [year_to]"
+    echo "  指定された期間の全都道府県の地価公示・地価調査データを一括取得"
+    echo ""
+    echo "Arguments:"
+    echo "  year_from  開始年度 (デフォルト: 1970)"
+    echo "  year_to    終了年度 (デフォルト: 2024)"
     echo ""
     echo "Example:"
-    echo "  $0        # ${START_YEAR}-${END_YEAR}年の全都道府県データを取得"
+    echo "  $0                # 1970-2024年の全都道府県データを取得"
+    echo "  $0 2020           # 2020-2024年の全都道府県データを取得"
+    echo "  $0 2020 2023      # 2020-2023年の全都道府県データを取得"
 }
 
 # 引数チェック
