@@ -1,3 +1,17 @@
+"""
+住所から緯度経度を取得してDBに格納するスクリプト
+
+対応テーブル:
+- land: reinfolib_land 地価公示データの住所（2020-2024年）
+- ext: estate_main_extended 物件基本情報の住所（全件）
+- clean: estate_cleaned クレンジング済み住所データ
+
+使用例:
+python make_location_mst.py --table land --update --skip
+python make_location_mst.py --table ext --update
+python make_location_mst.py --table clean --limit 5000 --update --skip
+"""
+
 import argparse
 import requests
 import pandas as pd
@@ -12,16 +26,52 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="住所から緯度経度を取得してDBに格納")
     parser.add_argument("--update", action="store_true", default=False, help="データベース更新を実行")
     parser.add_argument("--skip", action="store_true", default=False, help="既存データがある場合はスキップ")
+    parser.add_argument("--table", type=str, choices=["land", "ext", "clean"], 
+                        default="land", help="対象テーブル選択 (land: reinfolib_land, ext: estate_main_extended, clean: estate_cleaned)")
+    parser.add_argument("--limit", type=int, default=None, help="処理件数の上限")
     args = parser.parse_args()
     LOGGER.info(f"実行引数: {args}")
     
     # connection
     DB  = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
-    df  = DB.select_sql("select * from reinfolib_land where year between 2020 and 2024;")
-    url = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
-    list_ret = []
+    
+    # テーブル別のSQL構築
+    if args.table == "land":
+        sql = "SELECT location FROM reinfolib_land WHERE year BETWEEN 2020 AND 2024"
+        if args.limit:
+            sql += f" LIMIT {args.limit}"
+        LOGGER.info(f"対象テーブル: reinfolib_land (2020-2024年)")
+    elif args.table == "ext":
+        sql = "SELECT location FROM estate_main_extended WHERE location IS NOT NULL"
+        # extテーブルは全件処理（limitは適用しない）
+        LOGGER.info(f"対象テーブル: estate_main_extended (全件)")
+    elif args.table == "clean":
+        # estate_mst_cleanedで"住所"となっているid_cleanedを取得
+        sql = """
+        SELECT (ec.value_cleaned->>'location') as location
+        FROM estate_cleaned ec
+        JOIN estate_mst_cleaned emc ON ec.id_cleaned = emc.id
+        WHERE emc.name = '住所'
+        AND ec.value_cleaned->>'location' IS NOT NULL
+        """
+        if args.limit:
+            sql += f" LIMIT {args.limit}"
+        LOGGER.info(f"対象テーブル: estate_cleaned (住所クレンジング済み)")
+    
+    df = DB.select_sql(sql)
+    
+    if df.empty:
+        LOGGER.warning(f"{args.table}から住所データを取得できませんでした")
+        exit(1)
+    
+    LOGGER.info(f"取得した住所データ: {len(df)}件")
+    
+    # 重複除去後の住所数を確認
     locations = df.groupby("location")["location"].first().sort_values().tolist()
     total = len(locations)
+    LOGGER.info(f"重複除去後の住所数: {total}件")
+    
+    url = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
     for i, x in enumerate(locations, 1):
         # skipフラグがある場合、既存データをチェック
         if args.skip:
