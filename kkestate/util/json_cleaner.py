@@ -2381,7 +2381,15 @@ def _clean_address_string(address: str) -> str:
     # 角括弧の除去: 【角部屋】など
     selected_address = re.sub(r'【[^】]*】', '', selected_address)
     
-    # 5. 不要な空白や記号の整理
+    # かぎ括弧の除去: 「物件価格+諸費用+おまとめ」など
+    selected_address = re.sub(r'「[^」]*」', '', selected_address)
+    
+    # 5. 住所の後の不要な文字列を除去
+    # 番地の後に続く住所と関係ない文字列（例：頭金なし）を除去
+    # 数字-数字または数字の後の文字列を除去するパターン
+    selected_address = re.sub(r'(-?\d+(?:-\d+)?(?:号室)?)(頭金.*|物件.*|価格.*|諸費用.*|おまとめ.*)', r'\1', selected_address)
+    
+    # 6. 不要な空白や記号の整理
     selected_address = re.sub(r'\s+', '', selected_address)  # 連続する空白を削除
     selected_address = selected_address.strip()
     
