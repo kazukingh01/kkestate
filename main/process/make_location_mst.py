@@ -48,11 +48,9 @@ if __name__ == "__main__":
     elif args.table == "clean":
         # estate_mst_cleanedで"住所"となっているid_cleanedを取得
         sql = """
-        SELECT (ec.value_cleaned->>'location') as location
-        FROM estate_cleaned ec
-        JOIN estate_mst_cleaned emc ON ec.id_cleaned = emc.id
-        WHERE emc.name = '住所'
-        AND ec.value_cleaned->>'location' IS NOT NULL
+        SELECT (value_cleaned->>'location') as location
+        FROM estate_cleaned
+        WHERE id_cleaned in (SELECT id FROM estate_mst_cleaned WHERE name = '住所')
         """
         if args.limit:
             sql += f" LIMIT {args.limit}"
