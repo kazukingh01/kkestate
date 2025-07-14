@@ -280,15 +280,14 @@ if __name__ == "__main__":
                 DB.execute_sql(f"update estate_tmp set is_checked = true where url = '{url}';")
             else:
                 ## prefcode process
-                for url in df["url"].tolist():
-                    dfwk = DB.select_sql(f"select 1 from estate_tmp_pref WHERE url = '{url}'")
-                    if args.update:
-                        if dfwk.shape[0] > 0:
-                            DB.execute_sql(f"update estate_tmp_pref set target_checked = false, sys_updated = CURRENT_TIMESTAMP where url = '{url}';")
-                        else:
-                            DB.set_sql(f"insert into estate_tmp_pref (url) values ('{url}');")
-                            DB.set_sql(f"update estate_tmp_pref set target_checked = true, sys_updated = CURRENT_TIMESTAMP where url = '{url}';")
-                            DB.execute_sql()
+                if args.update:
+                    DB.execute_sql(f"update estate_tmp_pref set target_checked = false, sys_updated = CURRENT_TIMESTAMP where url in ('" + "','".join(df["url"].tolist())+ "');")
+                dfwk = DB.select_sql(f"select url from estate_tmp_pref where url in ('" + "','".join(df["url"].tolist())+ "');")
+                dfwk = df.loc[~df["url"].isin(dfwk["url"])].copy()
+                if args.update and dfwk.shape[0] > 0:
+                    DB.insert_from_df(dfwk[["url"]], "estate_tmp_pref", set_sql=True, is_select=False)
+                    DB.set_sql(f"update estate_tmp_pref set target_checked = true, sys_updated = CURRENT_TIMESTAMP where url in ('" + "','".join(dfwk["url"].tolist())+ "');")
+                    DB.execute_sql()
             ## common process
             if df.shape[0] > 0:
                 df_main = DB.select_sql("select id, url from estate_main where url in ('" + "','".join(df["url"].tolist())+ "');")
