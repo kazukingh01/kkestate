@@ -213,7 +213,7 @@ ALTER TABLE ONLY public.estate_detail
     ADD CONSTRAINT estate_detail_pkey PRIMARY KEY (id_run, id_key);
 CREATE INDEX idx_estate_detail_0 ON public.estate_detail USING btree (id_run);
 CREATE INDEX idx_estate_detail_1 ON public.estate_detail USING btree (id_key);
-CREATE INDEX IF NOT EXISTS idx_estate_detail_spec1_run ON public.estate_detail USING btree (id_run) WHERE id_key = 1;
+CREATE INDEX idx_estate_detail_spec1_run ON public.estate_detail USING btree (id_run) WHERE id_key = 1;
 
 
 --

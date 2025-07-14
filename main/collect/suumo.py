@@ -320,7 +320,6 @@ if __name__ == "__main__":
                 f"WITH tmp as (select url from estate_tmp_pref where target_checked = true) " + 
                 f"select main.id, tmp.url from tmp left join estate_main as main on tmp.url = estate_main.url;"
             )
-        raise
         list_df = []
         for url, id_main in df[["url", "id"]].values:
             if args.update:
