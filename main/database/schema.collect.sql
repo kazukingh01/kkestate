@@ -289,6 +289,13 @@ CREATE TRIGGER trg_update_sys_estate_tmp_0 BEFORE UPDATE ON public.estate_tmp FO
 
 
 --
+-- Name: estate_tmp_pref trg_update_sys_estate_tmp_pref_0; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_update_sys_estate_tmp_pref_0 BEFORE UPDATE ON public.estate_tmp_pref FOR EACH ROW EXECUTE FUNCTION public.update_sys_updated();
+
+
+--
 -- PostgreSQL database dump complete
 --
 
