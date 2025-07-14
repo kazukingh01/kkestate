@@ -265,7 +265,7 @@ if __name__ == "__main__":
     # initpref
     if args.initpref and args.update:
         DB.execute_sql("TRUNCATE TABLE estate_tmp_pref;")
-        DB.execute_sql("INSERT INTO estate_tmp_pref (url) SELECT url FROM estete_main;")
+        DB.execute_sql("INSERT INTO estate_tmp_pref (url) SELECT url FROM estate_main;")
 
     # main
     if args.runmain or args.prefcode is not None:
