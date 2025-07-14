@@ -324,8 +324,8 @@ if __name__ == "__main__":
                 df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
         else:
             df = DB.select_sql(
-                f"WITH tmp as (select url from estate_tmp_pref where target_checked = true) " + 
-                f"select main.id, tmp.url from tmp left join estate_main as main on tmp.url = estate_main.url;"
+                "WITH tmp as (select url from estate_tmp_pref where target_checked = true) " + 
+                "select main.id, tmp.url from tmp left join estate_main as main on tmp.url = main.url where main.id is not null;"
             )
         list_df = []
         for url, id_main in df[["url", "id"]].values:
