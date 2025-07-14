@@ -8,19 +8,59 @@ from kkestate.config.psgre import HOST, PORT, USER, PASS, DBNAME, DBTYPE
 LOGGER    = set_logger(__name__)
 BASE_URL  = "https://suumo.jp"
 LIST_TYPE = ["ms/shinchiku", "ms/chuko", "ikkodate", "chukoikkodate"]
-LIST_MST_URLS = [
-    f"{BASE_URL}/{y}/{x}/city/" for x in [
-        "hokkaido_", "aomori", "iwate", "akita", "miyagi", "yamagata", "fukushima",
-        "niigata", "ishikawa", "toyama", "nagano", "yamanashi", "fukui",
-        "tochigi", "gumma", "saitama", "ibaraki", "chiba", "tokyo", "kanagawa",
-        "gifu", "shizuoka", "aichi", "mie",
-        "shiga", "kyoto", "osaka", "nara", "wakayama", "hyogo",
-        "tottori", "shimane", "okayama", "hiroshima", "yamaguchi",
-        "kagawa", "tokushima", "kochi", "ehime",
-        "fukuoka", "oita", "saga", "nagasaki", "kumamoto", "miyazaki", "kagoshima", "okinawa",
-    ] for y in LIST_TYPE
-]
-
+DICT_MST_URLS = {
+    f"{code:02d}_{i}": f"{BASE_URL}/{y}/{name}/city/"
+    for code, name in [
+        (1, "hokkaido_"),
+        (2, "aomori"),
+        (3, "iwate"),
+        (4, "miyagi"),
+        (5, "akita"),
+        (6, "yamagata"),
+        (7, "fukushima"),
+        (8, "ibaraki"),
+        (9, "tochigi"),
+        (10, "gumma"),
+        (11, "saitama"),
+        (12, "chiba"),
+        (13, "tokyo"),
+        (14, "kanagawa"),
+        (15, "niigata"),
+        (16, "toyama"),
+        (17, "ishikawa"),
+        (18, "fukui"),
+        (19, "yamanashi"),
+        (20, "nagano"),
+        (21, "gifu"),
+        (22, "shizuoka"),
+        (23, "aichi"),
+        (24, "mie"),
+        (25, "shiga"),
+        (26, "kyoto"),
+        (27, "osaka"),
+        (28, "hyogo"),
+        (29, "nara"),
+        (30, "wakayama"),
+        (31, "tottori"),
+        (32, "shimane"),
+        (33, "okayama"),
+        (34, "hiroshima"),
+        (35, "yamaguchi"),
+        (36, "tokushima"),
+        (37, "kagawa"),
+        (38, "ehime"),
+        (39, "kochi"),
+        (40, "fukuoka"),
+        (41, "saga"),
+        (42, "nagasaki"),
+        (43, "kumamoto"),
+        (44, "oita"),
+        (45, "miyazaki"),
+        (46, "kagoshima"),
+        (47, "okinawa"),
+    ]
+    for i, y in enumerate(LIST_TYPE)
+}
 
 def get_url_ichiran(url):
     assert isinstance(url, str)
@@ -162,22 +202,40 @@ def get_estate_detail(url):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        epilog='''
+        python suumo.py --updateurls --update
+        python suumo.py --runmain    --update
+        python suumo.py --rundetail  --update --datefrom 20230101 --skipsuccess 
+        '''
+    )
     parser.add_argument("--updateurls",  action='store_true', default=False)
     parser.add_argument("--update",      action='store_true', default=False)
     parser.add_argument("--runmain",     action='store_true', default=False)
     parser.add_argument("--rundetail",   action='store_true', default=False)
     parser.add_argument("--skipsuccess", action='store_true', default=False)
     parser.add_argument("--datefrom",    type=str, help="--datefrom 20230101", required=False)
+    parser.add_argument("--prefcode",    type=lambda x: x.split(","), help="--pref 13,02")
     args = parser.parse_args()
+
+    if args.prefcode is not None:
+        for x in args.prefcode:
+            assert f"{x}_0" in DICT_MST_URLS
+        assert args.updateurls == False
+        assert args.runmain == False
+        assert args.rundetail == False
+        assert args.skipsuccess == False
+        assert args.datefrom is None
+        args.prefcode = list(set(args.prefcode))
 
     # connection
     DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
 
     # get url list
-    if args.updateurls:
-        list_urls = []
-        for x in LIST_MST_URLS:
+    if args.updateurls or args.prefcode is not None:
+        list_urls   = []
+        target_urls = DICT_MST_URLS.values() if args.prefcode is None else [DICT_MST_URLS[f"{x}_{i}"] for x in args.prefcode for i in range(len(LIST_TYPE))]
+        for x in target_urls:
             for _ in range(20):
                 url  = get_url_ichiran(x)
                 time.sleep(1)
@@ -194,52 +252,79 @@ if __name__ == "__main__":
                 list_page = int([x.text for x in soup.find("ol", class_="sortbox_pagination-parts").find_all("li", class_="sortbox_pagination-list")][-1])
             list_page = list(range(1, list_page + 1))
             for i_page in list_page: list_urls.append(f"{url}&page={i_page}" if url.find("?") > 0 else f"{url}?page={i_page}")
-        if args.update:
+        if args.update and args.updateurls:
             DB.set_sql("delete from estate_tmp;")
             DB.insert_from_df(pd.DataFrame(list_urls, columns=["url"]), "estate_tmp", is_select=False)
             DB.execute_sql()
     else:
         list_urls = DB.select_sql("select url from estate_tmp where is_checked = false;")["url"].tolist()
-    
+
     # main
-    if args.runmain:
+    if args.runmain or args.prefcode is not None:
+        if args.update and args.prefcode is not None:
+            ## prefcode process
+            DB.execute_sql("UPDATE estate_tmp_pref SET target_checked = null;")
         for i_url, url in enumerate(list_urls):
             dictwk = get_estate_list(url)
             df     = pd.DataFrame(dictwk)
-            if args.update:
+            if args.runmain and args.update:
+                ## runmain process
                 DB.execute_sql(f"update estate_tmp set is_checked = true where url = '{url}';")
-            if df.shape[0] > 0 and args.update:
+            else:
+                ## prefcode process
+                for url in df["url"].tolist():
+                    dfwk = DB.select_sql(f"select 1 from estate_tmp_pref WHERE url = '{url}'")
+                    if args.update:
+                        if dfwk.shape[0] > 0:
+                            DB.execute_sql(f"update estate_tmp_pref set target_checked = false, sys_updated = CURRENT_TIMESTAMP where url = '{url}';")
+                        else:
+                            DB.set_sql(f"insert into estate_tmp_pref (url) values ('{url}');")
+                            DB.set_sql(f"update estate_tmp_pref set target_checked = true, sys_updated = CURRENT_TIMESTAMP where url = '{url}';")
+                            DB.execute_sql()
+            ## common process
+            if df.shape[0] > 0:
                 df_main = DB.select_sql("select id, url from estate_main where url in ('" + "','".join(df["url"].tolist())+ "');")
                 df      = pd.merge(df, df_main, how="left", on="url")
-                if df["id"].isna().sum() > 0:
-                    DB.insert_from_df(df.loc[df["id"].isna(), ["name", "url"]], "estate_main", is_select=False)
-                    DB.execute_sql()
+                if df["id"].isna().sum() > 0 and args.update:
+                    ### register new estate
+                    DB.insert_from_df(df.loc[df["id"].isna(), ["name", "url"]], "estate_main", is_select=False, set_sql=False)
                 df_main = DB.select_sql("select id as id_new, url from estate_main where url in ('" + "','".join(df["url"].tolist())+ "');")
                 df      = pd.merge(df, df_main, how="left", on="url")
-                if args.update:
+                if args.update and args.runmain:
+                    ## updating sys_updated is only for "runmain" process
                     DB.execute_sql("update estate_main set sys_updated = CURRENT_TIMESTAMP where id in (" + ",".join(df["id_new"].astype(str).tolist()) +");")
+        if args.update and args.prefcode is not None:
+            ## prefcode process
+            DB.execute_sql("delete from estate_tmp_pref where target_checked = null;")
 
     # detail
-    if args.rundetail:
-        if args.datefrom is None:
-            date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    if args.rundetail or args.prefcode is not None:
+        if args.rundetail:
+            if args.datefrom is None:
+                date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                date = datetime.datetime.fromisoformat(args.datefrom).strftime('%Y-%m-%d %H:%M:%S')
+            date_check_from = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
+            if args.skipsuccess:
+                df = DB.select_sql(
+                    f"select main.id, main.url, sub.id as id_run, main.sys_updated from estate_main as main " + 
+                    f"left join estate_run as sub on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date}' " + 
+                    f"where main.sys_updated >= '{date}';"
+                )
+                df = df.sort_values(["id", "id_run"]).groupby("id").last().reset_index()
+                df = df.loc[df["id_run"].isna()].groupby("id").first().reset_index()
+            else:
+                df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
         else:
-            date = datetime.datetime.fromisoformat(args.datefrom).strftime('%Y-%m-%d %H:%M:%S')
-        date_check_from = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
-        if args.skipsuccess:
             df = DB.select_sql(
-                f"select main.id, main.url, sub.id as id_run, main.sys_updated from estate_main as main " + 
-                f"left join estate_run as sub on main.id = sub.id_main and sub.is_success = true and sub.timestamp >= '{date}' " + 
-                f"where main.sys_updated >= '{date}';"
+                f"WITH tmp as (select url from estate_tmp_pref where target_checked = true) " + 
+                f"select main.id, tmp.url from tmp left join estate_main as main on tmp.url = estate_main.url;"
             )
-            df = df.sort_values(["id", "id_run"]).groupby("id").last().reset_index()
-            df = df.loc[df["id_run"].isna()].groupby("id").first().reset_index()
-        else:
-            df = DB.select_sql(f"select id, url from estate_main where sys_updated >= '{date}';")
+        raise
         list_df = []
-        for url, id_new in df[["url", "id"]].values:
+        for url, id_main in df[["url", "id"]].values:
             if args.update:
-                id_run = DB.execute_sql(f"INSERT into estate_run (id_main, timestamp) VALUES ({id_new}, CURRENT_TIMESTAMP);SELECT lastval();")[0][0]
+                id_run = DB.execute_sql(f"INSERT into estate_run (id_main, timestamp) VALUES ({id_main}, CURRENT_TIMESTAMP);SELECT lastval();")[0][0]
             else:
                 id_run = None
             try:
@@ -267,7 +352,7 @@ if __name__ == "__main__":
             # insert
             df_detail["id_run"]  = id_run
             if df_detail.shape[0] > 0 and args.update:
-                df_prev_run = DB.select_sql(f"select id from estate_run where id_main = {id_new} and timestamp >= '{date_check_from}' and is_success = true;")
+                df_prev_run = DB.select_sql(f"select id from estate_run where id_main = {id_main} and timestamp >= '{date_check_from}' and is_success = true;")
                 if df_prev_run.shape[0] > 0:
                     df_prev     = DB.select_sql(f"select id_run, id_key, value as value_prev from estate_detail where id_run in (" + ",".join(df_prev_run["id"].astype(str).tolist()) +");")
                     df_prev     = df_prev.sort_values(["id_key", "id_run"]).reset_index(drop=True).groupby("id_key").last().reset_index(drop=False)

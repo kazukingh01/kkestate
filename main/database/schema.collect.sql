@@ -169,6 +169,21 @@ CREATE TABLE public.estate_tmp (
 
 ALTER TABLE public.estate_tmp OWNER TO postgres;
 
+
+--
+-- Name: estate_tmp_pref; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.estate_tmp_pref (
+    url text NOT NULL,
+    target_checked boolean,
+    sys_updated timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE public.estate_tmp_pref OWNER TO postgres;
+
+
 --
 -- Name: estate_main id; Type: DEFAULT; Schema: public; Owner: postgres
 --
