@@ -306,12 +306,12 @@ if __name__ == "__main__":
 
     # detail
     if args.rundetail or args.prefcode is not None:
+        date_check_from = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
         if args.rundetail:
             if args.datefrom is None:
                 date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
             else:
                 date = datetime.datetime.fromisoformat(args.datefrom).strftime('%Y-%m-%d %H:%M:%S')
-            date_check_from = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
             if args.skipsuccess:
                 df = DB.select_sql(
                     f"select main.id, main.url, sub.id as id_run, main.sys_updated from estate_main as main " + 
