@@ -216,6 +216,7 @@ if __name__ == "__main__":
     parser.add_argument("--skipsuccess", action='store_true', default=False)
     parser.add_argument("--datefrom",    type=str, help="--datefrom 20230101", required=False)
     parser.add_argument("--prefcode",    type=lambda x: x.split(","), help="--pref 13,02")
+    parser.add_argument("--initpref",    action='store_true', default=False)
     args = parser.parse_args()
 
     if args.prefcode is not None:
@@ -227,6 +228,8 @@ if __name__ == "__main__":
         assert args.skipsuccess == False
         assert args.datefrom is None
         args.prefcode = list(set(args.prefcode))
+    else:
+        assert args.initpref == False
 
     # connection
     DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
@@ -258,6 +261,11 @@ if __name__ == "__main__":
             DB.execute_sql()
     else:
         list_urls = DB.select_sql("select url from estate_tmp where is_checked = false;")["url"].tolist()
+
+    # initpref
+    if args.initpref and args.update:
+        DB.execute_sql("TRUNCATE TABLE estate_tmp_pref;")
+        DB.execute_sql("INSERT INTO estate_tmp_pref (url) SELECT url FROM estete_main;")
 
     # main
     if args.runmain or args.prefcode is not None:
