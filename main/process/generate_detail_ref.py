@@ -67,6 +67,12 @@ def get_extended_runs_data(db: DBConnector, run_ids: list[int] | None = None, re
     if recent_months is None:
         assert run_ids is not None
         assert isinstance(run_ids, list) and check_type_list(run_ids, int)
+        
+        # run_idsが空の場合の早期リターン
+        if len(run_ids) == 0:
+            LOGGER.warning("処理対象のrun_idがありません")
+            return pd.DataFrame(), None, None
+        
         dfwk = db.select_sql(
             f"""
             SELECT MIN(timestamp) as t_min, MAX(timestamp) as t_max FROM estate_run
@@ -197,7 +203,6 @@ if __name__ == "__main__":
     # データベース接続
     DB = DBConnector(HOST, port=PORT, dbname=DBNAME, user=USER, password=PASS, dbtype=DBTYPE, max_disp_len=200)
     
-    try:
         if args.command == 'stats':
             # 統計情報表示（is_refフラグベース）
             # 成功したRUN総数を取得
@@ -232,6 +237,12 @@ if __name__ == "__main__":
                 # 未処理分を自動処理（is_ref=falseのrun_idを対象）
                 run_ids = get_unprocessed_runs(DB, args.limit)["id_run"].tolist()
             df, run_id_min, run_id_max = get_extended_runs_data(DB, run_ids=run_ids, recent_months=args.recent, months_back=args.months)
+            
+            # 空のデータフレームの場合は正常終了
+            if df.empty:
+                LOGGER.info("処理対象のデータがありません")
+                sys.exit(0)
+            
             for id_run, id_main, timestamp in df.loc[(df["id_run"] >= run_id_min) & (df["id_run"] <= run_id_max), ["id_run", "id_main", "timestamp"]].to_numpy():
                 target_id_runs = df.loc[(df["id_main"] == id_main) & (df["timestamp"] >= (timestamp - timedelta(days=args.months * 31))) & (df["id_run"] <= id_run), "id_run"].tolist()
                 dfwk = get_keys_by_target_id_runs(DB, target_id_runs)
@@ -254,6 +265,3 @@ if __name__ == "__main__":
                     LOGGER.info(f"run_id={id_run}: {len(dfwk)}件の参照関係を保存", color=["BOLD", "GREEN"])
                 else:
                     LOGGER.info(f"run_id={id_run}: {len(dfwk)}件の参照関係を生成（--update未指定のため保存なし）")
-    except Exception as e:
-        LOGGER.error(f"処理中にエラーが発生しました: {e}", color=["BOLD", "RED"])
-        raise
