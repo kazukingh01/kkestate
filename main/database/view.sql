@@ -48,6 +48,7 @@ SELECT
     em.name,
     ld.location,
     ld.citycode,
+    em.url,
     
     -- 物件タイプ判定 (ms: マンション, ikkodate: 一戸建て, tochi: 土地, shinchiku: 新築, chuko: 中古)
     CASE 
