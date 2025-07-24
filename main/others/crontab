@@ -18,5 +18,7 @@ PATH=/home/ubuntu/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sb
 0    0   *       * * ubuntu  ${PYTHONPATH}/kklogrm --rm --path ${DIRBASE}/main/log/\*YYYYMMDD.log --fr 20010101 --to `date "+\%Y\%m\%d" --date '31 day ago'`
 */10 *   *       * * ubuntu  ${PYTHONPATH}/python ${DIRBASE}/main/others/process_kill.py "suumo.py" -c 0.01 -d 600 -i 1 -k
 0    17  *       * * ubuntu  ${PYTHONPATH}/python ${DIRBASE}/main/collect/suumo.py --prefcode 13,27 --update > ${DIRBASE}/main/log/run_pref.`date "+\%Y\%m\%d"`.log 2>&1
-0    */1 *       * * ubuntu  ${PYTHONPATH}/python ${DIRBASE}/main/process/process_estate.py process --batchsize 100000 --fr `date "+\%Y\%m\%d" --date '3 day ago'` --update > ${DIRBASE}/main/log/process_estate.`date "+\%Y\%m\%d"`.log 2>&1
+0    */1 *       * * ubuntu  ${PYTHONPATH}/python ${DIRBASE}/main/process/process_estate.py process --batchsize 100000 --fr `date "+\%Y\%m\%d" --date '3 day ago'` --update >> ${DIRBASE}/main/log/process_estate.`date "+\%Y\%m\%d"`.log 2>&1
 */1  *   *       * * ubuntu  ${PYTHONPATH}/python ${DIRBASE}/main/process/generate_detail_ref.py process --update --limit 400 > ${DIRBASE}/main/log/generate_detail_ref.`date "+\%Y\%m\%d"`.log 2>&1
+20   */1 *       * * root    docker exec --user=postgres postgres psql -U postgres -d estate -c "REFRESH MATERIALIZED VIEW estate_main_extended;"
+50   */1 *       * * ubuntu  ${PYTHONPATH}/python ${DIRBASE}/main/process/make_location_mst.py --table ext --update --skip >> ${DIRBASE}/main/log/make_location_mst.`date "+\%Y\%m\%d"`.log 2>&1

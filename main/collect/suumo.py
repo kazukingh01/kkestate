@@ -298,7 +298,7 @@ if __name__ == "__main__":
                 df_main = DB.select_sql("select id as id_new, url from estate_main where url in ('" + "','".join(df["url"].tolist())+ "');")
                 df      = pd.merge(df, df_main, how="left", on="url")
                 if args.update and args.runmain:
-                    ## updating sys_updated is only for "runmain" process
+                    ## runmain process (updating sys_updated is only for "runmain" process)
                     DB.execute_sql("update estate_main set sys_updated = CURRENT_TIMESTAMP where id in (" + ",".join(df["id_new"].astype(str).tolist()) +");")
         if args.update and args.prefcode is not None:
             ## prefcode process
