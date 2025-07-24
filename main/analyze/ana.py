@@ -84,8 +84,8 @@ def make_map(df_land: pd.DataFrame, df_suumo: pd.DataFrame, save_path: str="./ma
     ])
     from folium.plugins import MarkerCluster
     from branca.colormap import linear
-    colormap = linear.YlOrRd_09.scale(df_land["price_per_sqm"].quantile(0.1), df_land["price_per_sqm"].quantile(0.9))
-    colormap.caption = 'average price'
+    colormap = linear.YlOrRd_09.scale( df_suumo["price_per_sqm"].quantile(0.10), df_suumo["price_per_sqm"].quantile(0.90))
+    colormap.caption = 'average price (10% - 90%)'
     colormap.add_to(m)
     groups = {}
     for cat in (df_land['category'].unique().tolist() + list(DICT_TYPE.values())):
@@ -96,24 +96,18 @@ def make_map(df_land: pd.DataFrame, df_suumo: pd.DataFrame, save_path: str="./ma
         ).add_to(fg)
         m.add_child(fg)
         groups[cat] = mc
-    area_min, area_max = df_land["land_area"].quantile(0.01), df_land["land_area"].quantile(0.99)
+    area_min, area_max = df_suumo["area"].quantile(0.01), df_suumo["area"].quantile(0.99)
     list_points = [(x, y, "land") for x, y in df_land.iterrows()] + [(x, y, "suumo") for x, y in df_suumo.iterrows()]
     for _, row, _type in list_points:
         if _type == "land":
             lat, lon, price, area, cat = row['latitude'], row['longitude'], row['price_per_sqm'], row['land_area'], row['category']
+            price_org = -1
             url = None
         else:
-            lat, lon, price = row['latitude'], row['longitude'], row["price"]
+            lat, lon, price, area = row['latitude'], row['longitude'], row["price_per_sqm"], row["area"]
+            price_org = row["price"]
             cat1, cat2, url = row["building_type"], row["is_new"], row["url"]
-            area1, area2, area3 = row["area_ms"], row["area_land"], row["area_building"]
             cat = DICT_TYPE.get((cat2, cat1))
-            if cat1 == "house":
-                area = area3
-            elif cat1 == "mansion":
-                area = area1
-            else:
-                area = area2
-            price = (price * 10000) / area
         if area is None or np.isnan(area):
             area = df_land["land_area"].median()
         if np.isnan(lat) or np.isnan(lon) or np.isnan(price):
@@ -127,7 +121,13 @@ def make_map(df_land: pd.DataFrame, df_suumo: pd.DataFrame, save_path: str="./ma
             fill_color=colormap(price),
             fill_opacity=0.6,
             stroke=False,
-            popup=f"{cat}: {int(price)}, {area}m^2" + (f"<br><a href='https://suumo.jp/{url}'>link</a>" if url else ""),
+            popup=(
+                f"{cat}: {int(price)} 円/m^2" + 
+                f"<br>area: {int(area)} m^2" + 
+                f"<br>price: {int(price_org)} 円" + 
+                (f"<br><a href='/property/{row['id']}' target='_blank' rel='noopener noreferrer'>detail</a>" if url else "") +
+                (f"<br><a href='https://suumo.jp/{url}' target='_blank' rel='noopener noreferrer'>suumo</a>" if url else "")
+            ),
         ).add_to(groups[cat])
         folium.map.Marker(
             location=[lat, lon],
@@ -141,7 +141,7 @@ def make_map(df_land: pd.DataFrame, df_suumo: pd.DataFrame, save_path: str="./ma
                             text-shadow: 1px 1px 1px white;
                             transform: translate(-50%, -150%);
                         ">
-                            {int(price/1000)}
+                            {int(price/1000)}k
                         </div>'''
             )
         ).add_to(groups[cat])
@@ -210,6 +210,11 @@ if __name__ == "__main__":
     assert df_suumo.loc[(df_suumo["value_土地面積"].str["unit"] != "m^2") & (~df_suumo["area_land"].isna())].shape[0] == 0
     df_suumo["area_building"] = df_suumo["value_建物面積"].str["value"].copy()
     assert df_suumo.loc[(df_suumo["value_建物面積"].str["unit"] != "m^2") & (~df_suumo["area_building"].isna())].shape[0] == 0
+    df_suumo["area"] = df_suumo["area_ms"].copy()
+    df_suumo.loc[df_suumo["building_type"] == "house", "area"] = df_suumo["area_building"]
+    df_suumo.loc[df_suumo["building_type"] == "land",  "area"] = df_suumo["area_land"]
+    df_suumo["price_per_sqm"] = (df_suumo["price"] * 10000) / df_suumo["area"]
+    df_suumo.loc[df_suumo["price_per_sqm"] < 0, "price_per_sqm"] = -1
     ## 0.00001 ~= 1m, 1km ~= 0.01
     # BASE_D  = 0.01
     # make_heatmap(df, BASE_D)
